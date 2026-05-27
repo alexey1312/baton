@@ -6,7 +6,8 @@ context: |
   Tech stack:
   - Swift 6.3, Swift Package Manager, strict concurrency
   - swift-argument-parser (CLI), swift-log (logging), Noora (terminal UI)
-  - mattt/swift-toml (config parsing), swift-yyjson (JSON), swift-jinja (prompt/report templates)
+  - mattt/swift-toml (config parsing), swift-yyjson (JSON), swift-jinja (report/presentation
+    templates only — the prompt scaffold is built in code; see design Decision 4)
   - gh CLI (GitHub integration), git (diff collection)
 
   Configuration:

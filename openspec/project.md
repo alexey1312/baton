@@ -23,7 +23,7 @@ agents across the *sections* (scopes) of a monorepo and aggregates their finding
 - Noora (Tuist) — interactive terminal UI, prompts, progress
 - mattt/swift-toml — `baton.toml` parsing (Codable, toml++)
 - swift-yyjson — JSON parsing of agent output and run records
-- swift-jinja — prompt and report templates
+- swift-jinja — report/presentation templates only (the prompt scaffold is built in code; see design Decision 4)
 - `gh` CLI — GitHub integration (reviews, Check Runs, thread resolution)
 - `git` — diff collection and base resolution
 - swift-docc-plugin — DocC documentation (deployed to GitHub Pages)
