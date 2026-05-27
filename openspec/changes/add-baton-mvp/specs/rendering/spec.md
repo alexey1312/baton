@@ -80,6 +80,21 @@ The system SHALL present each rendered finding with its severity badge (low, med
 - **THEN** the rendered finding SHALL include a collapsible "Instructions for AI agents" block
 - **AND** that block SHALL be sourced from the saved finding's content rather than newly generated
 
+### Requirement: Comment Marker And Usefulness Feedback
+
+The system SHALL embed a stable, machine-recognizable footer marker (`<!-- baton:finding -->`) in every rendered GitHub comment body so that re-runs can deduplicate posted comments and a future `learn` capability can identify Baton-authored threads. The `github-review` inline-comment body SHALL additionally include a short affordance inviting the reviewer to react 👍/👎 to signal whether the finding was useful.
+
+#### Scenario: Rendered GitHub comment carries the footer marker
+
+- **WHEN** a finding is rendered into a `github-review` inline comment or a `github-summary`/`check-run` entry
+- **THEN** the rendered body SHALL contain the `<!-- baton:finding -->` footer marker
+
+#### Scenario: Inline comment invites a usefulness reaction
+
+- **WHEN** a finding is rendered into a `github-review` inline comment
+- **THEN** the body SHALL include a short prompt inviting a 👍/👎 reaction to indicate whether the finding was useful
+- **AND** the prompt SHALL be produced by the template (presentation), requiring nothing to be posted by Baton (reviewers add the reaction themselves)
+
 ### Requirement: No re-invocation
 
 The system SHALL render any format operating purely over the saved run record and SHALL NOT re-invoke any agent, coding CLI, or LLM during rendering.

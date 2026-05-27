@@ -417,6 +417,15 @@ preserve three things:
    scope. Keeping owner resolution a reusable, side-effect-free function enables this.
 3. **Per-scope agent/skills reuse.** A `learn` pass for a scope should drive that scope's effective
    `[agent]` and skills — already provided by Decision 3 + the cascade; no MVP change needed.
+4. **Reaction-based usefulness signal (improvement over blick).** blick reads no reactions; its only
+   signal is a thread's resolved/unresolved/outdated state plus reply text, which is ambiguous (a
+   resolved thread may be a *fix* or a *dismissal*). Baton's comment template invites a 👍/👎 reaction
+   ("React 👍/👎 if useful"; see `rendering`), and a future `learn` reads the `+1`/`-1` reactions on
+   its own comments — identified by the `<!-- baton:finding -->` marker, via the GitHub reactions API
+   — as a direct usefulness weight, **combined with** (not replacing) the resolved/unresolved signal,
+   since reactions are sparse. This costs the MVP nothing beyond the template nudge + marker; reading
+   and weighting reactions is a `learn`-time concern. A 👎-heavy rule is a strong candidate to relax
+   or remove; a 👍-heavy one to reinforce.
 
 ### Inheritance for `learn`: split, not blanket (recorded intent, not built)
 
