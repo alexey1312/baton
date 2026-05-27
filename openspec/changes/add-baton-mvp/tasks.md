@@ -12,13 +12,13 @@
 
 ## 2. config-cascade
 
-- [ ] 2.1 Define `baton.toml` Codable schema (`[agent]`, `[defaults]` incl. `timeout` (default 600), `[[skills]]`, `[[reviews]]`, `[security]`)
-- [ ] 2.2 Parse with swift-toml; validation with `recoverySuggestion` on malformed config
-- [ ] 2.3 `discover`: walk tree, collect every `baton.toml`, skip `.git/node_modules/target/dist/build/.venv`
-- [ ] 2.4 `inherit`: ancestor-chain merge — agent (block), skills (union+closest), defaults (field), reviews (inherit+override+disable)
-- [ ] 2.5 Auto-discover local skills (`.baton/skills/<name>/SKILL.md`), prepended before explicit entries
-- [ ] 2.6 Track provenance per effective value
-- [ ] 2.7 Tests: cascade rules, reviews inheritance/disable, provenance
+- [x] 2.1 Define `baton.toml` Codable schema (`[agent]`, `[defaults]` incl. `timeout` (default 600), `[[skills]]`, `[[reviews]]`, `[security]`)
+- [x] 2.2 Parse with swift-toml; validation with `recoverySuggestion` on malformed config
+- [x] 2.3 `discover`: walk tree, collect every `baton.toml`, skip `.git/node_modules/target/dist/build/.venv`
+- [x] 2.4 `inherit`: ancestor-chain merge — agent (block), skills (union+closest), defaults (field), reviews (inherit+override+disable)
+- [x] 2.5 Auto-discover local skills (`.baton/skills/<name>/SKILL.md`), prepended before explicit entries
+- [x] 2.6 Track provenance per effective value
+- [x] 2.7 Tests: cascade rules, reviews inheritance/disable, provenance
 
 ## 3. diff-routing
 
@@ -87,8 +87,8 @@
 ## 10. Robustness, edge cases & tool preflight
 
 - [ ] 10.1 Tool preflight + `doctor`: distinct errors for missing/unauthenticated agent, missing `gh`, missing `git`
-- [ ] 10.2 config: no `baton.toml` found; no resolvable `[agent]`; duplicate review/skill names; review references undefined skill; `disabled_reviews` unknown name (no-op); unknown TOML keys (lenient warn)
-- [ ] 10.3 scope discovery: do not follow symlinked directories; never escape the repo root
+- [x] 10.2 config: no `baton.toml` found; no resolvable `[agent]`; duplicate review/skill names; review references undefined skill; `disabled_reviews` unknown name (no-op); unknown TOML keys (lenient warn)
+- [x] 10.3 scope discovery: do not follow symlinked directories; never escape the repo root
 - [ ] 10.4 diff: invalid/unfetched base ref; empty diff (exit 0); rename across scope boundary (new path wins); binary & deleted files; quoted/space/unicode paths in `diff --git` headers
 - [ ] 10.5 chunking: single file > budget → by-hunk fallback → whole-hunk + `truncated` flag + warning
 - [ ] 10.6 focus-mode: previous review SHA unreachable (force-push) → fall back to full base diff + warn
