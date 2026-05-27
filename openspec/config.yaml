@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  Project: Baton — an AI code-review orchestrator for monorepos (Swift reimagining of tuist/blick).
+
+  Tech stack:
+  - Swift 6.3, Swift Package Manager, strict concurrency
+  - swift-argument-parser (CLI), swift-log (logging), Noora (terminal UI)
+  - mattt/swift-toml (config parsing), swift-yyjson (JSON), swift-jinja (prompt/report templates)
+  - gh CLI (GitHub integration), git (diff collection)
+
+  Configuration:
+  - Language is TOML (baton.toml). Cascade across a monorepo is computed in code by
+    walking the directory tree (NOT via config-language features). TOML is chosen over PKL
+    deliberately: configs are read from arbitrary (possibly untrusted) repositories, and TOML
+    is pure data with zero code-execution surface.
+
+  Domain:
+  - Baton discovers a per-scope baton.toml in every subtree of a monorepo, routes a PR diff to
+    the deepest owning scope, runs coding-CLI agents (claude/codex/gemini/opencode) concurrently
+    per (scope, review), parses structured findings, and publishes them to GitHub PRs (resolvable
+    review comments + Check Runs) via the gh CLI.
+
+  Conventions:
+  - Conventional commits; OpenSpec for spec-driven development.
+  - Cross-platform: macOS + Linux primary, Windows best-effort (#if os(...) guards).
+
+rules:
+  proposal:
+    - Keep proposals focused; always include Why / What Changes / Impact
+  tasks:
+    - Group tasks by capability; keep each task small and independently verifiable
+  design:
+    - Record the reasoning ("Why") behind every non-obvious decision, including rejected alternatives
