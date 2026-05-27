@@ -1,0 +1,137 @@
+amends "package://github.com/jdx/hk/releases/download/v1.39.0/hk@1.39.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.39.0/hk@1.39.0#/Builtins.pkl"
+
+// =============================================================================
+// hk configuration for Baton
+// =============================================================================
+// Git hooks run through mise (`mise x -- hk run …`). All steps run in parallel.
+// The hk version here is kept in sync with the `hk` pin in mise.toml.
+// =============================================================================
+
+// Excludes for generated/binary files.
+local generated_excludes = List(".build/**", "docs/**", "CHANGELOG.md")
+
+// Externally-managed docs/tooling dirs that should not be reformatted by Baton hooks.
+local doc_excludes = List(".claude/**", ".codex/**", "openspec/**")
+
+// Excludes for template files (trailing whitespace/newlines are significant there).
+local template_excludes = List("**/*.jinja", "**/*.jinja.include")
+
+// =============================================================================
+// Swift linters (parallel, check_first optimization)
+// =============================================================================
+// Note: unlike ExFig, no hardcoded SourceKit TOOLCHAIN_DIR — the active
+// toolchain (swiftly/Xcode/CI) is found via PATH. GUI git clients that need an
+// explicit toolchain can set TOOLCHAIN_DIR in their environment.
+
+local swift_linters = new Mapping<String, Step> {
+    ["swiftformat"] {
+        glob = List("*.swift")
+        check = "swiftformat --lint {{files}}"
+        fix = "swiftformat {{files}}"
+        batch = true
+        stage = List("*.swift")
+        check_first = true
+        hide = true
+    }
+    ["swiftlint"] {
+        glob = List("*.swift")
+        fix = "swiftlint --fix {{files}}"
+        batch = true
+        stage = List("*.swift")
+        hide = true
+    }
+    // Strict check after fix to catch unfixable errors.
+    ["swiftlint-strict"] {
+        glob = List("*.swift")
+        check = "swiftlint lint --strict --quiet {{files}}"
+        batch = true
+        depends = "swiftlint"
+        hide = true
+    }
+}
+
+// =============================================================================
+// dprint formatter (Markdown) — Rust-based, fast
+// =============================================================================
+
+local dprint_checks = new Mapping<String, Step> {
+    ["dprint"] = (Builtins.dprint) {
+        exclude = List(
+            "CHANGELOG.md",
+            "Sources/**/*.docc/**",
+            ".claude/**",
+            ".codex/**",
+            "openspec/**",
+            ".github/ISSUE_TEMPLATE/**"
+        )
+        stage = List("*.md")
+        check_first = true
+        hide = true
+    }
+}
+
+// =============================================================================
+// Builtin checks (fast, parallel)
+// =============================================================================
+
+local builtin_checks = new Mapping<String, Step> {
+    ["trailing-whitespace"] = (Builtins.trailing_whitespace) {
+        exclude = generated_excludes + template_excludes + doc_excludes
+        hide = true
+    }
+    ["check-merge-conflict"] = (Builtins.check_merge_conflict) {
+        hide = true
+    }
+    ["newlines"] = (Builtins.newlines) {
+        exclude = generated_excludes + template_excludes + doc_excludes
+        hide = true
+    }
+    ["actionlint"] {
+        glob = List(".github/workflows/*.yml", ".github/workflows/*.yaml")
+        check = "actionlint {{files}}"
+        batch = true
+        hide = true
+    }
+}
+
+// =============================================================================
+// Combined linters
+// =============================================================================
+
+local all_linters = new Mapping<String, Step> {
+    ...swift_linters
+    ...dprint_checks
+    ...builtin_checks
+}
+
+// =============================================================================
+// Hooks
+// =============================================================================
+
+hooks {
+    // Pre-commit: run all linters with auto-fix and re-stage.
+    ["pre-commit"] {
+        fix = true
+        stash = "none"
+        steps = all_linters
+    }
+
+    // Commit-msg: validate Conventional Commits format.
+    ["commit-msg"] {
+        steps {
+            ["conventional-commit"] = Builtins.check_conventional_commit
+        }
+    }
+
+    // Helper: run all linters with fix.
+    ["fix"] {
+        fix = true
+        steps = all_linters
+    }
+
+    // Helper: run all linters without fix.
+    ["check"] {
+        steps = all_linters
+    }
+}

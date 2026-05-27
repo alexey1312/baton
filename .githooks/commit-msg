@@ -1,0 +1,11 @@
+#!/bin/sh
+# Commit-msg hook — validates Conventional Commits format via hk (through mise).
+# Skip with: HK=0.
+test "${HK:-1}" = "0" && exit 0
+
+if ! command -v mise >/dev/null 2>&1; then
+    echo "hk: mise not found on PATH; skipping commit-msg hook (install mise or set HK=0)" >&2
+    exit 0
+fi
+
+exec mise x -- hk run --silent commit-msg "$@"
