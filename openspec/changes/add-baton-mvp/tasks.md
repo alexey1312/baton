@@ -2,13 +2,13 @@
 
 ## 1. Project scaffolding
 
-- [ ] 1.1 Create `Package.swift` (Swift 6.3, executable `baton`, targets `BatonKit`/`BatonForge`/`BatonCLI` + tests)
-- [ ] 1.2 Add dependencies: swift-argument-parser, swift-log, Noora, mattt/swift-toml, swift-yyjson, swift-jinja
+- [x] 1.1 Create `Package.swift` (Swift 6.3, executable `baton`, targets `BatonKit`/`BatonForge`/`BatonCLI` + tests)
+- [x] 1.2 Add dependencies: swift-argument-parser, swift-log, Noora, mattt/swift-toml, swift-yyjson, swift-jinja
 - [ ] 1.3 Add `mise.toml` (swift 6.3, swiftlint, swiftformat, xcsift, gh, git-cliff) and tasks (build/test/lint/format)
-- [ ] 1.4 Port ExFig scaffolding: `TerminalUI/` (Noora wrapper, `TTYDetector`, output coordination), logger bootstrap
-- [ ] 1.5 Port error model: `LocalizedError` + `recoverySuggestion` + formatter
+- [x] 1.4 Port ExFig scaffolding: `TerminalUI/` (Noora wrapper, `TTYDetector`, output coordination), logger bootstrap
+- [x] 1.5 Port error model: `LocalizedError` + `recoverySuggestion` + formatter
 - [ ] 1.6 CI workflows: build-macos, build-linux (swift:6.3), build-windows (best-effort), lint
-- [ ] 1.7 Windows spike: verify `mattt/swift-toml` builds; record fallback to `LebJe/TOMLKit` if needed
+- [x] 1.7 Windows spike: verify `mattt/swift-toml` builds; record fallback to `LebJe/TOMLKit` if needed
 
 ## 2. config-cascade
 
