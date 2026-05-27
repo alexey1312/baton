@@ -1,7 +1,6 @@
-import Testing
 @testable import BatonKit
+import Testing
 
-@Suite("Core domain types")
 struct CoreTypesTests {
     @Test("Severity is ordered low < medium < high")
     func severityOrdering() {
@@ -26,8 +25,13 @@ struct CoreTypesTests {
     @Test("Error formatter renders description and recovery")
     func errorFormatting() {
         struct Sample: BatonError {
-            var errorDescription: String? { "boom" }
-            var recoverySuggestion: String? { "try again" }
+            var errorDescription: String? {
+                "boom"
+            }
+
+            var recoverySuggestion: String? {
+                "try again"
+            }
         }
         let rendered = BatonErrorFormatter().format(Sample())
         #expect(rendered == "✗ boom\n  → try again")

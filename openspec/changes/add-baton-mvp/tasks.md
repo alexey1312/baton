@@ -4,7 +4,7 @@
 
 - [x] 1.1 Create `Package.swift` (Swift 6.3, executable `baton`, targets `BatonKit`/`BatonForge`/`BatonCLI` + tests)
 - [x] 1.2 Add dependencies: swift-argument-parser, swift-log, Noora, mattt/swift-toml, swift-yyjson, swift-jinja
-- [ ] 1.3 Add `mise.toml` (swift 6.3, swiftlint, swiftformat, xcsift, gh, git-cliff) and tasks (build/test/lint/format)
+- [x] 1.3 Add `mise.toml` (swift 6.3, swiftlint, swiftformat, xcsift, gh, git-cliff) and tasks (build/test/lint/format)
 - [x] 1.4 Port ExFig scaffolding: `TerminalUI/` (Noora wrapper, `TTYDetector`, output coordination), logger bootstrap
 - [x] 1.5 Port error model: `LocalizedError` + `recoverySuggestion` + formatter
 - [ ] 1.6 CI workflows: build-macos, build-linux (swift:6.3), build-windows (best-effort), lint

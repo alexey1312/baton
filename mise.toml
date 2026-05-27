@@ -1,0 +1,120 @@
+# =============================================================================
+# mise configuration for Baton
+# =============================================================================
+# Pins the toolchain and defines the canonical project tasks. Build/test pipe
+# through xcsift for token-efficient output.
+
+[settings]
+experimental = true
+legacy_version_file = false
+
+# Auto-configure git hooks on directory entry (hooks live in .githooks/).
+[hooks]
+enter = """
+git config core.hooksPath .githooks 2>/dev/null || true
+"""
+
+# =============================================================================
+# Tools
+# =============================================================================
+
+[tools]
+swift = "6.3"          # Swift toolchain
+swiftformat = "0.60.1" # Swift code formatting
+swiftlint = "0.63.2"   # Swift linting
+xcsift = "1.2.0"       # xcodebuild/SPM output filtering
+dprint = "0.53.1"      # Markdown/JSON formatting
+hk = "1.39.0"          # Git hooks manager
+pkl = "0.31.1"         # Configuration language (for hk.pkl)
+actionlint = "1.7.11"  # GitHub Actions linting
+git-cliff = "2.12.0"   # Changelog generation
+
+# =============================================================================
+# Build & test
+# =============================================================================
+
+[tasks.build]
+description = "Build the Swift package (debug)"
+run = "swift build 2>&1 | xcsift -f toon"
+
+[tasks."build:release"]
+description = "Build the Swift package (release)"
+run = "swift build --configuration release 2>&1 | xcsift -f toon"
+
+[tasks.test]
+description = "Run all tests"
+run = "swift test 2>&1 | xcsift -f toon"
+
+[tasks."test:filter"]
+description = "Run tests matching a filter (usage: mise run test:filter BatonKitTests)"
+run = "swift test --filter {{arg(name='filter')}} 2>&1 | xcsift -f toon"
+
+# =============================================================================
+# Lint & format
+# =============================================================================
+
+[tasks.lint]
+description = "Run SwiftLint (strict) and actionlint"
+run = """
+swiftlint lint --strict Sources Tests 2>&1 | xcsift -f toon
+actionlint
+"""
+
+[tasks."format:swift"]
+description = "Format Swift code"
+run = "swiftformat Sources Tests"
+
+[tasks."format-check:swift"]
+description = "Check Swift formatting (CI)"
+run = "swiftformat Sources Tests --lint"
+
+[tasks."format:md"]
+description = "Format markdown files"
+run = "dprint fmt"
+
+[tasks."format-check:md"]
+description = "Check markdown formatting (CI)"
+run = "dprint check"
+
+[tasks.format]
+description = "Format all files (Swift + Markdown)"
+run = """
+swiftformat Sources Tests
+dprint fmt
+"""
+
+[tasks.format-check]
+description = "Check all formatting (CI)"
+run = """
+set -o pipefail
+swiftformat Sources Tests --lint
+dprint check
+"""
+
+# =============================================================================
+# Docs, changelog, clean
+# =============================================================================
+
+[tasks.docs]
+description = "Generate DocC documentation"
+run = """
+swift package --allow-writing-to-directory docs \
+    generate-documentation --target BatonCLI \
+    --disable-indexing \
+    --transform-for-static-hosting \
+    --hosting-base-path baton \
+    --output-path docs
+echo '<script>window.location.href += "/documentation/batoncli"</script>' > docs/index.html
+"""
+
+[tasks.changelog]
+description = "Generate CHANGELOG.md from git history"
+run = "git-cliff -o CHANGELOG.md"
+
+[tasks."changelog:unreleased"]
+description = "Preview unreleased changes"
+run = "git-cliff --unreleased"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "swift package clean && rm -rf .build"

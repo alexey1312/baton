@@ -1,5 +1,5 @@
 /// Output verbosity for CLI commands, derived from flags and the environment.
-enum OutputMode: Sendable {
+enum OutputMode {
     /// Default mode with spinners and colors (interactive TTY).
     case normal
     /// Detailed output including timestamps and source locations.
@@ -18,7 +18,9 @@ enum OutputMode: Sendable {
     }
 
     /// Whether animations should be used.
-    var useAnimations: Bool { self == .normal }
+    var useAnimations: Bool {
+        self == .normal
+    }
 
     /// Whether colors should be used.
     var useColors: Bool {
@@ -29,5 +31,7 @@ enum OutputMode: Sendable {
     }
 
     /// Whether debug-level messages should be shown.
-    var showDebug: Bool { self == .verbose }
+    var showDebug: Bool {
+        self == .verbose
+    }
 }

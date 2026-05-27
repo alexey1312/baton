@@ -1,8 +1,7 @@
 import ArgumentParser
-import Testing
 @testable import BatonCLI
+import Testing
 
-@Suite("CLI scaffolding")
 struct OutputModeTests {
     @Test("quiet takes precedence over verbose")
     func quietWins() {

@@ -1,7 +1,6 @@
-import Testing
 @testable import BatonForge
+import Testing
 
-@Suite("Forge protocol")
 struct ForgeTests {
     /// A stand-in forge used to exercise the protocol surface until `GitHubForge`
     /// lands in the github-publish phase.
