@@ -34,9 +34,15 @@ that slice; findings render locally or publish to a GitHub PR via `gh`.
 
 - **swift-toml**: its `.convertFromSnakeCase` is broken for camelCase props — declare explicit snake_case `CodingKeys` instead.
 - **TOML semantics**: top-level keys (e.g. `disabled_reviews`) must precede any `[table]`/`[[array]]` header or they bind to the last table.
-- **mise tasks that pipe** need `#!/usr/bin/env bash` + `set -euo pipefail` (Linux runner uses dash; a bare `swift build | xcsift` returns xcsift's exit 0 and masks failures).
-- **swiftlint --strict** rules hit here: `optional_data_string_conversion` (use `String(bytes:encoding:) ?? ""`, not `String(decoding:as:)`); `for_where`; `function_parameter_count` ≤5 (bundle into a request struct); `function_body_length` ≤60; line length 120.
-- **swiftformat** removes `@Suite("name")` and rewrites closures to key-path shorthand — the latter can break the `#expect` macro; extract to a `let` first.
+- **mise tasks that pipe** need `#!/usr/bin/env bash` + `set -euo pipefail` (Linux runner uses dash; a bare `swift build | xcsift` returns xcsift's exit 0 and masks failures). xcsift has no Linux build, so build/test tasks fall back to plain `swift` when it is absent.
+- **swiftlint --strict** rules hit here: `optional_data_string_conversion` (use `String(bytes:encoding:) ?? ""`, not `String(decoding:as:)`); `for_where`; `function_parameter_count` ≤5 (bundle into a request struct); `function_body_length` ≤60; line length 120; `file_length` is 600 (test files run long).
+- **swiftformat** removes `@Suite("name")` and rewrites closures to key-path shorthand — the latter can break the `#expect` macro; extract to a `let` first. `--ifdef no-indent` keeps `#if` bodies at column 0.
+
+## Cross-platform (Windows is best-effort, but CI is green on all three)
+
+- **Never hardcode `/usr/bin/env`** to launch a subprocess — it does not exist on Windows. Use `ProcessLauncher.configure(_:executable:arguments:)` (BatonKit), which keeps the POSIX `/usr/bin/env` path and resolves via `PATH`+`PATHEXT` on Windows. All process launchers (`ProcessExecutor`, `GitRunner`, `LiveGHRunner`, doctor's gh check) go through it.
+- The package **compiles on Windows** — swift-toml (toml++/C++ interop) builds fine, so no `LebJe/TOMLKit` fallback is needed.
+- Tests that spawn real subprocesses (git, `echo`/`cat`/`sleep`, a `/bin/sh` fixture), create symlinks, or assume POSIX `PATH`/`/bin/sh` are gated behind `#if !os(Windows)`. macOS/Linux run all 138 tests; Windows runs the platform-agnostic subset. The CI Windows job is `continue-on-error` but currently passes.
 
 ## Workflow
 

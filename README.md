@@ -50,10 +50,6 @@ brew install alexey1312/tap/baton           # Homebrew
 
 From source (Swift 6.3, macOS 13+): `swift build -c release && .build/release/baton --help`.
 
-## Notes
-
-- Builds and runs on macOS and Linux. Windows is best-effort.
-- macOS binaries are not signed or notarized yet. If Gatekeeper blocks the binary, clear the
-  quarantine flag: `xattr -d com.apple.quarantine <path>`.
-- Release archives are on the [Releases](https://github.com/alexey1312/swift-baton/releases)
-  page; full docs at <https://alexey1312.github.io/baton>.
+Builds on macOS, Linux, and Windows. Prebuilt archives are on the
+[Releases](https://github.com/alexey1312/swift-baton/releases) page, and full docs are at
+<https://alexey1312.github.io/baton>.
