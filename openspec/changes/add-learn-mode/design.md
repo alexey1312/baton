@@ -58,7 +58,9 @@ directories (auto-discovered `.baton/skills/**` and any local `[[skills]]` sourc
 dependency manifests are refused. The agent runs per scope with that scope's effective
 `[agent]` + skills and may only touch that scope's own setup. The self-reinforcing property
 holds: a bad setup edit shows up next window as more ignored/👎 threads, which the next pass
-tries to fix.
+tries to fix. Enforcement is post-hoc and does not trust the agent: the allowlist is applied to
+the files the agent actually changed (any out-of-allowlist path is dropped from the proposal),
+not to a self-reported description of intended edits.
 
 ## Decision 5 — Delivery: one rolling draft PR, safe-by-default
 
@@ -68,6 +70,9 @@ configured (root `[learn]` delivery fields) or explicitly requested. When delive
 all proposals across all scopes funnel into a single rolling draft PR per repository on the
 `learn` branch; subsequent runs force-update that branch/PR rather than opening new ones,
 making re-runs idempotent (stateless scan + single rolling PR ⇒ nothing to double-count).
+Idempotency here is about delivery — one converging PR with no double-counted signal — not
+byte-identical agent output: the analysis is agent-driven, so the invariant we hold is on the
+inputs fed to the agent (signal + candidate ranking), not on the exact edit text.
 
 ## Decision 6 — CI execution model
 
@@ -81,6 +86,12 @@ permission (e.g. a local PAT) degrades to preview output plus a warning rather t
 
 - Reaction sparsity: reactions are opt-in and rare; the design combines them with thread state
   rather than relying on them alone.
+- Reaction authorship: 👍/👎 are counted from reviewers, but the pull request author's own
+  reactions on Baton threads are excluded so a self-reaction cannot manufacture signal.
 - `resolved` ambiguity: a resolved thread may be a fix or a dismissal — reaction weight
   augments but does not override resolution state (a resolved + 👎 thread is not auto-reinforced).
+- Resolution provenance: resolution is read as a human usefulness signal, but Baton ships a
+  `resolveReviewThread` mutation; if Baton ever auto-resolves its own outdated threads,
+  "resolved" stops meaning "human accepted." `learn` therefore counts only human-actor
+  resolution and ignores resolution produced by Baton's own automation.
 - GitHub App token requirement for some operations (mirrors the MVP Check Run caveat).

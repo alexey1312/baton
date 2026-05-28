@@ -25,7 +25,8 @@ where runners are ephemeral and `.baton/` is gitignored.
 - The usefulness signal is read authoritatively from GitHub on every run (👍/👎 via the
   Reactions API, thread resolution via GraphQL). CI execution is therefore **stateless**; an
   optional local SQLite cache under gitignored `.baton/` exists only to power `baton stats`
-  trends and avoid re-fetching, and is never required, committed, or depended on.
+  trends and avoid re-fetching (never widening the effective `lookback_days` window), and is
+  never required, committed, or depended on.
 - The `[learn]` config block is **split** in the cascade: delivery fields are root-only;
   analysis fields cascade closest-wins per scope.
 - A scheduled GitHub Actions workflow (`.github/workflows/learn.yml`) becomes the primary,
@@ -36,10 +37,12 @@ where runners are ephemeral and `.baton/` is gitignored.
 
 ### New Capabilities
 
-- `learn`: a periodic, opt-in reflection pass that reads usefulness signal (👍/👎 reactions
+- `learn`: a periodic reflection pass that reads usefulness signal (👍/👎 reactions
   + thread resolution) from merged PRs, attributes it per scope, and proposes review-setup
-  edits as a single rolling draft PR — gated by `min_signal` over a `lookback_days` window,
-  constrained to an edit allowlist, safe-by-default (preview), and runnable unattended on CI.
+  edits as a single rolling draft PR — preview by default (no GitHub writes; `enabled` defaults
+  to `true`), with delivery opt-in via the root `[learn]` delivery fields and per-scope opt-out
+  via `enabled = false` — gated by `min_signal` over a `lookback_days` window, constrained to an
+  edit allowlist, and runnable unattended on CI.
 
 ### Modified Capabilities
 

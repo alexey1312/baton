@@ -43,6 +43,11 @@ the GitHub Reactions API) and each thread's resolution state (via GitHub GraphQL
 - **THEN** the system SHALL read the 👍/👎 reactions on its comment via the Reactions API
 - **AND** the system SHALL read the thread's resolution state (resolved, unresolved, or outdated) via GraphQL
 
+#### Scenario: Resolution by Baton's own automation is not human signal
+
+- **WHEN** a thread's resolution or outdated state was produced by Baton's own automation rather than a human actor
+- **THEN** the system SHALL NOT treat that resolution as a usefulness signal
+
 #### Scenario: Human-authored threads count as missing-coverage signal
 
 - **WHEN** a merged pull request contains a human-authored review thread that Baton did not author
@@ -58,17 +63,20 @@ the GitHub Reactions API) and each thread's resolution state (via GitHub GraphQL
 The system SHALL treat GitHub as the authoritative source of signal and SHALL re-derive the
 signal from GitHub on every run so that a run requires no persisted local state. The system
 MAY cache observed signal in a local store under `.baton/` for trend reporting, but SHALL NOT
-require, commit, or depend on that cache for correctness.
+require, commit, or depend on that cache for correctness. The cache SHALL NOT extend the
+effective signal window beyond `lookback_days`: any cross-window history it retains feeds only
+`baton stats` trends and SHALL NOT enter the input a scope's agent analyzes.
 
 #### Scenario: A run with no local cache still produces signal
 
 - **WHEN** the system runs in an environment with no pre-existing local cache (e.g. an ephemeral CI runner)
 - **THEN** the system SHALL collect the full signal by reading GitHub and SHALL proceed without error
 
-#### Scenario: Cache presence does not change proposals
+#### Scenario: Cache presence does not change the agent's inputs
 
 - **WHEN** the same window and GitHub state are processed once with and once without the local cache present
-- **THEN** the system SHALL produce the same proposed edits in both cases
+- **THEN** the system SHALL feed each scope's agent the same collected signal and the same candidate ranking in both cases
+- **AND** the local cache SHALL NOT add, remove, or reweight any signal relative to reading GitHub alone
 
 ### Requirement: Per-Scope Signal Attribution
 
@@ -91,7 +99,8 @@ The system SHALL bucket collected threads into accepted, ignored, outdated, and 
 categories, and SHALL combine the reaction weight (+1 per 👍, −1 per 👎) with the thread's
 resolution state to rank findings — treating 👎-heavy rules as candidates to relax or remove
 and 👍-heavy rules as candidates to reinforce. Reaction weight SHALL augment, not replace, the
-resolution signal.
+resolution signal. Reactions authored by the pull request's own author SHALL NOT be counted,
+so a self-reaction cannot manufacture signal.
 
 #### Scenario: Upvoted, resolved finding is a reinforce candidate
 
@@ -113,11 +122,19 @@ resolution signal.
 - **WHEN** a thread is resolved but carries net-negative 👎 reactions
 - **THEN** the system SHALL NOT treat it as a reinforce candidate solely because it was resolved
 
+#### Scenario: Author's own reaction is not counted
+
+- **WHEN** the 👍/👎 reaction on a Baton thread was authored by the pull request's own author
+- **THEN** the system SHALL exclude that reaction from the reaction weight
+
 ### Requirement: Edit Allowlist Excludes Source Code
 
 The system SHALL restrict every proposed edit to the review setup — `baton.toml` review
 prompts and skill lists, local skill directories, and agent-facing documentation — and SHALL
-refuse to modify source code, tests, CI workflows, or dependency manifests.
+refuse to modify source code, tests, CI workflows, or dependency manifests. The system SHALL
+enforce the allowlist by inspecting the file changes the agent actually produced and dropping
+any path outside the allowlist, rather than relying on the agent to self-report a compliant
+proposal.
 
 #### Scenario: Setup edits are allowed
 
@@ -128,6 +145,12 @@ refuse to modify source code, tests, CI workflows, or dependency manifests.
 
 - **WHEN** the analysis proposes an edit to a source file, a test, a CI workflow, or a dependency manifest
 - **THEN** the system SHALL refuse that edit and SHALL exclude it from the proposal
+
+#### Scenario: Out-of-allowlist changes are dropped even when the agent emits them
+
+- **WHEN** the agent writes changes that touch a path outside the allowlist alongside permitted setup edits
+- **THEN** the system SHALL keep only the permitted setup edits
+- **AND** the system SHALL drop the out-of-allowlist changes from the proposal
 
 ### Requirement: Per-Scope Agent Pass Over Setup
 
@@ -144,12 +167,30 @@ The system SHALL run the learning analysis for each scope using that scope's eff
 - **WHEN** the agent proposes edits for a scope
 - **THEN** the system SHALL accept only edits to that scope's own `baton.toml`, local skills, and agent docs
 
-### Requirement: Rolling Draft Pull Request Delivery
+### Requirement: Missing-Coverage Proposals From Human Threads
+
+The system SHALL feed each scope's human-authored missing-coverage signal into that scope's
+agent pass and SHALL accept a resulting proposal that adds or broadens a review or skill to
+cover the uncovered category, subject to the same edit allowlist and per-scope limits as any
+other proposed edit.
+
+#### Scenario: Missing-coverage signal is offered to the agent
+
+- **WHEN** a scope has human-authored review threads recorded as missing-coverage signal
+- **THEN** the system SHALL include that signal in the scope's agent pass
+- **AND** the system SHALL accept a resulting proposal that adds or broadens a `[[reviews]]` entry or skill within the allowlist
+
+#### Scenario: No proposal without a recognizable gap
+
+- **WHEN** a scope's human-authored threads do not cluster into a category Baton fails to cover
+- **THEN** the system SHALL propose no new coverage for that scope
+
+### Requirement: Rolling Pull Request Delivery
 
 When delivery is enabled, the system SHALL consolidate all proposed edits across all scopes
-into a single rolling draft pull request per repository on the configured `learn` branch, and
-SHALL update the existing branch and pull request on subsequent runs rather than opening new
-ones.
+into a single rolling pull request per repository on the configured `learn` branch — opened as
+a draft by default and configurable via the root `[learn].draft` field — and SHALL update the
+existing branch and pull request on subsequent runs rather than opening new ones.
 
 #### Scenario: First run opens one draft pull request
 
@@ -163,13 +204,23 @@ ones.
 
 ### Requirement: Gating By Minimum Signal And Opt-In
 
-The system SHALL emit no proposal for a scope whose accumulated signal is below the effective
-`min_signal` threshold, and SHALL skip any scope whose effective `[learn].enabled` is false.
+The system SHALL gate each scope on signal volume — the count of Baton-authored threads
+attributed to the scope within the `lookback_days` window — and SHALL NOT measure `min_signal`
+against the signed reaction weight, so that a scope rich in negative (👎) signal is never
+skipped for being "below threshold." The system SHALL emit no proposal for a scope whose
+signal volume is below the effective `min_signal`, and SHALL skip any scope whose effective
+`[learn].enabled` is false.
 
 #### Scenario: Below-threshold scope yields no proposal
 
-- **WHEN** a scope's collected signal is below its effective `min_signal`
+- **WHEN** the count of Baton-authored threads attributed to a scope in the window is below its effective `min_signal`
 - **THEN** the system SHALL emit no proposed edits for that scope
+
+#### Scenario: Negative signal does not push a scope below threshold
+
+- **WHEN** a scope meets its `min_signal` thread count but those threads are net-negative (👎-heavy)
+- **THEN** the system SHALL NOT skip the scope for being below threshold
+- **AND** the system SHALL treat the underlying rules as relax-or-remove candidates per the weighting rule
 
 #### Scenario: Disabled scope is skipped
 
