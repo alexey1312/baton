@@ -32,6 +32,17 @@ public struct ReviewTaskResult: Sendable, Codable {
     public var warnings: [String]
     /// Files marked truncated by chunking.
     public var truncatedFiles: [String]
+    /// Total wall-clock time spent across all chunks of this task, in ms.
+    /// Optional so legacy on-disk run records still decode.
+    public var durationMs: Int?
+    /// Token and cost accounting summed across all chunks. Optional for the
+    /// same reason; nil means no chunk emitted parseable usage.
+    public var usage: AgentUsage?
+    /// The resolved agent kind for this task (e.g. `claude`). Optional for
+    /// backwards-compat with run records written before this field existed.
+    public var agentKind: String?
+    /// The resolved model for this task, if one was set. Optional.
+    public var model: String?
 
     public init(
         scope: String,
@@ -41,7 +52,11 @@ public struct ReviewTaskResult: Sendable, Codable {
         taskFailed: Bool = false,
         errorMessage: String? = nil,
         warnings: [String] = [],
-        truncatedFiles: [String] = []
+        truncatedFiles: [String] = [],
+        durationMs: Int? = nil,
+        usage: AgentUsage? = nil,
+        agentKind: String? = nil,
+        model: String? = nil
     ) {
         self.scope = scope
         self.review = review
@@ -51,6 +66,10 @@ public struct ReviewTaskResult: Sendable, Codable {
         self.errorMessage = errorMessage
         self.warnings = warnings
         self.truncatedFiles = truncatedFiles
+        self.durationMs = durationMs
+        self.usage = usage
+        self.agentKind = agentKind
+        self.model = model
     }
 
     /// Whether this review failed under its `fail_on` threshold: any finding at or

@@ -121,6 +121,8 @@ public struct ReviewOrchestrator: Sendable {
         var prompts: [String] = []
         var outputs: [String] = []
         var truncated: Set<String> = []
+        var durationMs: Int = 0
+        var usage: AgentUsage = .zero
     }
 
     private func runOne(_ spec: TaskSpec) async -> CompletedTask {
@@ -133,7 +135,11 @@ public struct ReviewOrchestrator: Sendable {
                 findings: Self.dedupe(run.findings),
                 failOn: failOn,
                 warnings: run.warnings,
-                truncatedFiles: run.truncated.sorted()
+                truncatedFiles: run.truncated.sorted(),
+                durationMs: run.durationMs > 0 ? run.durationMs : nil,
+                usage: run.usage.hasData ? run.usage : nil,
+                agentKind: spec.agent.kind.rawValue,
+                model: spec.model
             )
             return CompletedTask(
                 result: result,
@@ -148,7 +154,9 @@ public struct ReviewOrchestrator: Sendable {
                 findings: [],
                 failOn: failOn,
                 taskFailed: true,
-                errorMessage: message
+                errorMessage: message,
+                agentKind: spec.agent.kind.rawValue,
+                model: spec.model
             )
             return CompletedTask(result: result, prompt: "", rawOutput: "")
         }
@@ -191,6 +199,10 @@ public struct ReviewOrchestrator: Sendable {
             run.findings += outcome.findings
             run.warnings += outcome.warnings
             run.outputs.append(outcome.rawOutput)
+            run.durationMs += Int((outcome.duration * 1000).rounded())
+            if let usage = outcome.usage {
+                run.usage = run.usage.adding(usage)
+            }
         }
         return run
     }
