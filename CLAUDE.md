@@ -1,0 +1,46 @@
+# Baton
+
+Swift 6.3 CLI (`baton`) — orchestrates AI code review across a monorepo. Each subtree
+declares a `baton.toml`; the diff is routed to the deepest owning scope; per `(scope, review)`
+an external coding CLI (claude/codex/gemini/opencode, plus a `custom` escape hatch) reviews
+that slice; findings render locally or publish to a GitHub PR via `gh`.
+
+## Modules (keep the boundaries)
+
+- `BatonKit` — core domain logic. **No UI deps** (no ArgumentParser/Noora). Config/Scope/Git/
+  Skill/Agent/Review/RunRecord. Shared GitHub payload formatting lives here (`GitHubPresentation`)
+  so both BatonForge and BatonCLI reuse it.
+- `BatonForge` — GitHub via the `gh` CLI (`GHRunning` is injected for testing). Depends on BatonKit.
+- `BatonCLI` — `@main` executable, ArgumentParser commands, TerminalUI (Noora), rendering.
+  Retroactive conformances like `AgentKind: ExpressibleByArgument` live here (no `@retroactive` —
+  same package).
+
+## Commands (via mise; build/test pipe through xcsift)
+
+- `mise run build` / `mise run test` — debug build / full test suite.
+- `mise run test:filter <Suite>` — e.g. `mise run test:filter BatonKitTests`.
+- `mise run lint` — swiftlint --strict + actionlint. `mise run format` — swiftformat + dprint fmt.
+- `mise run format-check` — CI formatting gate. swiftformat is via mise: `mise x swiftformat@0.60.1 -- swiftformat Sources Tests`.
+- New mise config needs `mise trust` once.
+
+## Conventions
+
+- Every domain error conforms to `BatonError` (LocalizedError + `recoverySuggestion`), rendered `✗ <desc>` / `→ <recovery>`.
+- Tests use **swift-testing** (`import Testing`, `@Test`, `#expect`, `#require`). `#require` requires the test be `throws` + `try`.
+- Use `FileManager.default` inline (not a `static let` — concurrency). Thread-safe helpers are `@unchecked Sendable` over `NSLock`; mocks accessed from async are `actor`s (`NSLock.lock()` is unavailable in async).
+- JSON: use `JSONCodec` (BatonKit, YYJSON wrapper). DOM access for parsing varied agent output.
+
+## Gotchas
+
+- **swift-toml**: its `.convertFromSnakeCase` is broken for camelCase props — declare explicit snake_case `CodingKeys` instead.
+- **TOML semantics**: top-level keys (e.g. `disabled_reviews`) must precede any `[table]`/`[[array]]` header or they bind to the last table.
+- **mise tasks that pipe** need `#!/usr/bin/env bash` + `set -euo pipefail` (Linux runner uses dash; a bare `swift build | xcsift` returns xcsift's exit 0 and masks failures).
+- **swiftlint --strict** rules hit here: `optional_data_string_conversion` (use `String(bytes:encoding:) ?? ""`, not `String(decoding:as:)`); `for_where`; `function_parameter_count` ≤5 (bundle into a request struct); `function_body_length` ≤60; line length 120.
+- **swiftformat** removes `@Suite("name")` and rewrites closures to key-path shorthand — the latter can break the `#expect` macro; extract to a `let` first.
+
+## Workflow
+
+- Commit directly to `main`, granular Conventional Commits. Automated commits use `HK=0 git commit` (hooks validated separately).
+- After a chunk: `swiftformat` → `swiftlint --strict` → `swift test` (through xcsift), commit, push, then `gh run watch <id>` to verify CI.
+- Tooling/CI scaffolding is ported from the ExFig project at `/Users/aleksei/Developer/ExFig` — compare against it when CI/tooling misbehaves.
+- OpenSpec change `add-baton-mvp` tracks the MVP tasks (`openspec validate add-baton-mvp --strict`).
