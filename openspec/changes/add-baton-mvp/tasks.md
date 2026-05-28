@@ -110,10 +110,10 @@
 - [x] 12.2 `hk.pkl` + `.githooks/`: `pre-commit` (swiftformat, swiftlint --strict, dprint, actionlint; auto-fix + restage) and `commit-msg` (conventional commits); delegate via `mise x -- hk run`; honor `HK=0`; align hk pin between `mise.toml` and `hk.pkl`
 - [ ] 12.3 Linter/formatter configs: `.swiftlint.yml`, `.swiftformat`, `dprint.json` (drop ExFig PKL/llms-specific bits)
 - [ ] 12.4 CI `ci.yml`: triggers push `main` + PR, concurrency-cancel; `lint` job (`format-check` + `lint` + `actionlint`) → `build-macos` + `build-linux` (swift:6.3, xcsift, `.build` cache) + `build-windows` (best-effort)
-- [ ] 12.5 DocC: `Baton.docc` catalog on the executable target; `swift-docc-plugin` (`#if !os(Windows)`); `docs` task generates static-hosting site (base path `baton`) + redirect `index.html`
+- [x] 12.5 DocC: `Baton.docc` catalog on the executable target; `swift-docc-plugin` (`#if !os(Windows)`); `docs` task generates static-hosting site (base path `baton`) + redirect `index.html`
 - [ ] 12.6 `deploy-docc.yml`: build + deploy DocC to GitHub Pages on `v*` tags + manual dispatch (`pages: write`, `id-token: write`)
 - [ ] 12.7 `release.yml`: on `v*` tags build macOS universal (`lipo` arm64+x86_64) + Linux (static stdlib) + Windows (best-effort); set version into the command source; `git-cliff` notes; `softprops/action-gh-release` with archives; prerelease when tag has `-`
-- [ ] 12.8 `cliff.toml`: conventional-commit groups; remote `owner/repo` = your repo
+- [x] 12.8 `cliff.toml`: conventional-commit groups; remote `owner/repo` = your repo
 - [ ] 12.9 `update-version` job: regenerate `CHANGELOG.md` + commit to `main` (non-prerelease only)
 - [ ] 12.10 `update-homebrew` job: compute SHA256 of macOS/Linux archives, bump `Formula/baton.rb` in `alexey1312/homebrew-tap` (secret `HOMEBREW_TAP_TOKEN`); non-prerelease only
 - [ ] 12.11 README install docs: `mise use -g github:alexey1312/swift-baton` and `brew install alexey1312/tap/baton`
