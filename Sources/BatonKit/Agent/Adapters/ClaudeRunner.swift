@@ -27,14 +27,54 @@ public struct ClaudeRunner: AgentRunner {
 
     public init() {}
 
+    /// Claude's JSON envelope: `result` carries the model text, `usage` and
+    /// `total_cost_usd` carry token/cost accounting we surface in stats.
+    private struct Usage: Decodable {
+        var input_tokens: Int?
+        var output_tokens: Int?
+        var cache_creation_input_tokens: Int?
+        var cache_read_input_tokens: Int?
+    }
+
+    private struct Envelope: Decodable {
+        var result: String?
+        var total_cost_usd: Double?
+        var usage: Usage?
+    }
+
     public func parse(_ output: AgentOutput) throws -> ParsedFindings {
-        struct Envelope: Decodable { var result: String? }
-        if let data = output.stdout.data(using: .utf8),
-           let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
-           let inner = envelope.result
-        {
-            return try FindingsParser.parse(inner)
+        guard let data = output.stdout.data(using: .utf8),
+              let envelope = try? JSONDecoder().decode(Envelope.self, from: data)
+        else {
+            return try FindingsParser.parse(output.stdout)
         }
-        return try FindingsParser.parse(output.stdout)
+
+        let inner = envelope.result ?? output.stdout
+        var parsed = try FindingsParser.parse(inner)
+        parsed.usage = Self.makeUsage(from: envelope)
+        return parsed
+    }
+
+    /// Convert Claude's envelope into an ``AgentUsage``. Cache token counts
+    /// are folded into `inputTokens` because they bill at input rates.
+    private static func makeUsage(from envelope: Envelope) -> AgentUsage? {
+        let usage = envelope.usage
+        let cost = envelope.total_cost_usd
+        let input = sum(usage?.input_tokens, usage?.cache_creation_input_tokens, usage?.cache_read_input_tokens)
+        let output = usage?.output_tokens
+        if input == nil, output == nil, cost == nil {
+            return nil
+        }
+        return AgentUsage(
+            inputTokens: input,
+            outputTokens: output,
+            totalCostUSD: cost,
+            source: .agentEnvelope
+        )
+    }
+
+    private static func sum(_ values: Int?...) -> Int? {
+        let present = values.compactMap { $0 }
+        return present.isEmpty ? nil : present.reduce(0, +)
     }
 }

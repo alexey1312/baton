@@ -6,6 +6,21 @@ public struct AgentRunOutcome: Sendable {
     public var rawOutput: String
     public var warnings: [String]
     public var duration: TimeInterval
+    public var usage: AgentUsage?
+
+    public init(
+        findings: [Finding],
+        rawOutput: String,
+        warnings: [String],
+        duration: TimeInterval,
+        usage: AgentUsage? = nil
+    ) {
+        self.findings = findings
+        self.rawOutput = rawOutput
+        self.warnings = warnings
+        self.duration = duration
+        self.usage = usage
+    }
 }
 
 /// Runs an agent invocation through ``ProcessExecutor`` and turns its output into
@@ -37,7 +52,8 @@ public struct AgentInvoker: Sendable {
                 findings: parsed.findings,
                 rawOutput: result.stdoutText,
                 warnings: parsed.warnings,
-                duration: result.duration
+                duration: result.duration,
+                usage: parsed.usage
             )
         } catch {
             throw AgentError.parseFailure(

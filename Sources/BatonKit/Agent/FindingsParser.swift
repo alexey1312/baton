@@ -1,10 +1,18 @@
 import Foundation
 
 /// Findings parsed from an agent's textual output, plus any non-fatal warnings
-/// produced while clamping or dropping malformed fields.
+/// produced while clamping or dropping malformed fields, and optional usage
+/// extracted from the agent's envelope.
 public struct ParsedFindings: Sendable {
     public var findings: [Finding]
     public var warnings: [String]
+    public var usage: AgentUsage?
+
+    public init(findings: [Finding], warnings: [String] = [], usage: AgentUsage? = nil) {
+        self.findings = findings
+        self.warnings = warnings
+        self.usage = usage
+    }
 }
 
 /// Robustly extracts `[Finding]` from an agent's textual output.
