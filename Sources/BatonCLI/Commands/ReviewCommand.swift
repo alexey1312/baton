@@ -49,7 +49,7 @@ struct ReviewCommand: AsyncParsableCommand {
 
             let resolvedBase = BaseResolver.resolve(flag: base, scopeDefault: rootDefaults(effectives)?.base)
             let diff = try DiffCollector(git: git).collect(base: resolvedBase)
-            let headSHA = (try? git.revParse("HEAD")) ?? ""
+            let headSHA = try git.revParse("HEAD")
             let store = RunRecordStore(repoRoot: root)
             let repoIdentity = RepoIdentity.resolve(repoRoot: root)
             let database = RunDatabaseStore(location: .both(repoRoot: root))
@@ -58,27 +58,27 @@ struct ReviewCommand: AsyncParsableCommand {
                 let hook = RunRecordStore.DatabaseHook(
                     store: database, repo: repoIdentity, status: .empty, cliVersion: Self.cliVersion
                 )
-                try store.write(
+                let outcome = try store.write(
                     runId: RunRecordStore.newRunId(),
                     base: resolvedBase, headSHA: headSHA, tasks: [], database: hook
                 )
-                emitDatabaseWarnings(database)
+                emitDatabaseWarnings(outcome.databaseErrors)
                 TerminalOutput.shared.out(NooraUI.info("No changes to review.", useColors: global.outputMode.useColors))
                 return
             }
 
             let plans = buildPlans(effectives: effectives, diff: diff, scopes: discovery.scopes, root: root)
             let tasks = try await orchestrate(plans: plans, root: root, git: git)
-            let outcome = ReviewOutcome(results: tasks.map(\.result))
-            let status: RunStatus = outcome.shouldFailExit ? .failed : .success
+            let reviewOutcome = ReviewOutcome(results: tasks.map(\.result))
+            let status: RunStatus = reviewOutcome.shouldFailExit ? .failed : .success
             let hook = RunRecordStore.DatabaseHook(
                 store: database, repo: repoIdentity, status: status, cliVersion: Self.cliVersion
             )
-            try store.write(
+            let writeOutcome = try store.write(
                 runId: RunRecordStore.newRunId(),
                 base: resolvedBase, headSHA: headSHA, tasks: tasks, database: hook
             )
-            emitDatabaseWarnings(database)
+            emitDatabaseWarnings(writeOutcome.databaseErrors)
 
             try renderAndExit(store: store, tasks: tasks)
         }
@@ -168,8 +168,8 @@ struct ReviewCommand: AsyncParsableCommand {
         }
     }
 
-    private func emitDatabaseWarnings(_ database: RunDatabaseStore) {
-        for error in database.lastErrors() {
+    private func emitDatabaseWarnings(_ errors: [BatonDatabaseError]) {
+        for error in errors {
             let message = error.errorDescription ?? "Database write failed"
             TerminalOutput.shared.err(NooraUI.warning(message, useColors: global.outputMode.useColors))
         }
