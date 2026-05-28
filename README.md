@@ -1,23 +1,25 @@
 # Baton
 
-Monorepo AI code-review orchestrator. Like a conductor's baton directing an ensemble, it
-routes each part of a pull request to the right reviewer: every scope of a monorepo gets its
-own agent, model, skills, and standards through cascading `baton.toml` configuration.
+Baton runs AI code review across a monorepo, one scope at a time. Each subtree keeps its own
+`baton.toml`, and the settings cascade down the tree with the closest one winning, so the iOS
+code and the backend code can use different agents, models, skills, and standards. The name
+comes from a conductor's baton: it directs the reviewers, it doesn't play.
 
-Baton discovers scopes, routes the diff to the deepest owning scope, runs the configured
-reviews concurrently through external coding CLIs, and renders the findings locally or
-publishes them to a GitHub PR — Baton has no model of its own.
+Baton has no model of its own. It finds the scopes, routes the diff to the deepest one that
+owns each file, runs the configured reviews through external coding CLIs, and either prints
+the findings or posts them to a GitHub pull request.
 
 ## Features
 
-- **Per-scope config cascade** — each subtree's `baton.toml` inherits and overrides
-  (agent/model/skills/reviews), closest-wins, with provenance.
-- **Pluggable agents** — claude, codex, gemini, opencode, or a `custom` CLI; `binary`/`args`
-  honored uniformly.
-- **Structural diff chunking** — splits oversized diffs by file/hunk (never mid-line), not raw bytes.
-- **Skill security** — remote skills are SHA-pinned and source-allowlisted; their markdown
-  is embedded in an isolated, untrusted prompt block.
-- **GitHub publish** — resolvable inline comments + per-`(scope, review)` Check Runs via `gh`.
+- Per-scope configuration that cascades down the tree, with `baton config --explain` showing
+  where each effective value came from.
+- Works with claude, codex, gemini, opencode, or any other CLI through `kind = "custom"`. The
+  `binary` and `args` overrides apply to every agent the same way.
+- Oversized diffs are split at file and hunk boundaries, never mid-line, instead of being cut
+  off at a byte count.
+- Remote skills must be pinned to a commit SHA and matched against an allowlist, and their
+  markdown enters the prompt as untrusted reference data rather than instructions.
+- Posts resolvable inline comments and one Check Run per `(scope, review)` through the `gh` CLI.
 
 ## Quick start
 
@@ -29,9 +31,8 @@ baton render --format markdown                       # render the saved run (no 
 baton publish                                         # post findings to the GitHub PR
 ```
 
-`baton review security` runs one review; `--base origin/main` sets the diff base; `--json`
-emits machine-readable findings. `baton config --explain` prints the effective per-scope
-config with the source of each value.
+`baton review security` runs a single review. `--base origin/main` sets the diff base, and
+`--json` prints machine-readable findings.
 
 ## Install
 
@@ -44,8 +45,8 @@ From source (Swift 6.3, macOS 13+): `swift build -c release && .build/release/ba
 
 ## Notes
 
-- Builds and is tested on macOS and Linux; Windows is best-effort.
-- macOS binaries are **not** code-signed/notarized in the MVP — clear quarantine with
-  `xattr -d com.apple.quarantine <path>` if Gatekeeper blocks them.
-- Prebuilt archives are on [Releases](https://github.com/alexey1312/swift-baton/releases);
-  docs at <https://alexey1312.github.io/baton>.
+- Builds and runs on macOS and Linux. Windows is best-effort.
+- macOS binaries are not signed or notarized yet. If Gatekeeper blocks the binary, clear the
+  quarantine flag: `xattr -d com.apple.quarantine <path>`.
+- Release archives are on the [Releases](https://github.com/alexey1312/swift-baton/releases)
+  page; full docs at <https://alexey1312.github.io/baton>.
