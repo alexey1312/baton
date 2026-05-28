@@ -106,6 +106,29 @@ struct FindingsParserTests {
         #expect(usage.source == .agentEnvelope)
     }
 
+    @Test("GeminiRunner unwraps the JSON envelope and parses the fenced response")
+    func geminiEnvelope() throws {
+        // Gemini wraps the model text in {session_id, response, stats}; the real
+        // findings live inside `response` as a ```json fenced block.
+        let block = #"{\"findings\":[{\"file\":\"a\",\"severity\":\"low\",\"title\":\"t\",\"body\":\"b\"}]}"#
+        let inner = #"```json\n\#(block)\n```"#
+        let envelope = #"{"session_id":"x","response":"\#(inner)","stats":{}}"#
+        let parsed = try GeminiRunner().parse(
+            AgentOutput(stdout: envelope, stderr: "", exitStatus: 0)
+        )
+        #expect(parsed.findings.count == 1)
+        #expect(parsed.findings.first?.file == "a")
+    }
+
+    @Test("GeminiRunner falls back to raw stdout when output is not an envelope")
+    func geminiPlainOutput() throws {
+        let plain = #"{"findings":[{"file":"a","severity":"low","title":"t","body":"b"}]}"#
+        let parsed = try GeminiRunner().parse(
+            AgentOutput(stdout: plain, stderr: "", exitStatus: 0)
+        )
+        #expect(parsed.findings.count == 1)
+    }
+
     @Test("ClaudeRunner leaves usage nil when envelope omits accounting fields")
     func claudeEnvelopeNoUsage() throws {
         let inner = #"[{\"file\":\"a\",\"severity\":\"low\",\"title\":\"t\",\"body\":\"b\"}]"#
