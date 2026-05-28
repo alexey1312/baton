@@ -1,4 +1,6 @@
-// swiftlint:disable file_length
+#if !os(Windows)
+// Windows is best-effort: these tests spawn subprocesses (git / POSIX coreutils
+// like echo, cat / a /bin/sh fixture) that are unavailable on the Windows runner.
 @testable import BatonKit
 import Foundation
 import Testing
@@ -235,7 +237,11 @@ struct RemoteSkillResolverTests {
         try SkillTestFixtures.withTempDir { root in
             let remote = root.appendingPathComponent("remotes/org/skills", isDirectory: true)
             let git = try SkillTestFixtures.initRepo(remote)
-            try SkillTestFixtures.writeFile(remote.appendingPathComponent("skills/owasp"), "SKILL.md", "owasp-remote")
+            try SkillTestFixtures.writeFile(
+                remote.appendingPathComponent("skills/owasp"),
+                "SKILL.md",
+                "owasp-remote"
+            )
             let sha = try SkillTestFixtures.commitAll(git)
 
             let r = SkillTestFixtures.remoteResolver(root: root)
@@ -290,7 +296,11 @@ struct RemoteSkillResolverTests {
         try SkillTestFixtures.withTempDir { root in
             let remote = root.appendingPathComponent("remotes/org/skills", isDirectory: true)
             let git = try SkillTestFixtures.initRepo(remote)
-            try SkillTestFixtures.writeFile(remote.appendingPathComponent("custom/place"), "SKILL.md", "custom-body")
+            try SkillTestFixtures.writeFile(
+                remote.appendingPathComponent("custom/place"),
+                "SKILL.md",
+                "custom-body"
+            )
             let sha = try SkillTestFixtures.commitAll(git)
 
             let r = SkillTestFixtures.remoteResolver(root: root)
@@ -400,7 +410,11 @@ struct SkillPinEnforcementTests {
         try SkillTestFixtures.withTempDir { root in
             let remote = root.appendingPathComponent("remotes/org/skills", isDirectory: true)
             let git = try SkillTestFixtures.initRepo(remote)
-            try SkillTestFixtures.writeFile(remote.appendingPathComponent("skills/owasp"), "SKILL.md", "pinned-body")
+            try SkillTestFixtures.writeFile(
+                remote.appendingPathComponent("skills/owasp"),
+                "SKILL.md",
+                "pinned-body"
+            )
             let sha = try SkillTestFixtures.commitAll(git)
 
             let r = SkillTestFixtures.remoteResolver(root: root)
@@ -545,3 +559,4 @@ struct SkillSecurityTests {
 }
 
 // swiftlint:enable file_length
+#endif

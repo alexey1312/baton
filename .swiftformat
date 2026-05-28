@@ -6,4 +6,5 @@
 --maxwidth 120
 --wraparguments before-first
 --wrapcollections before-first
+--ifdef no-indent
 --exclude .build,Packages

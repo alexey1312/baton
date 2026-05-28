@@ -1,3 +1,4 @@
+import BatonKit
 import Foundation
 
 /// The captured result of a single `gh` invocation.
@@ -65,8 +66,7 @@ public struct LiveGHRunner: GHRunning {
 
     private static func runBlocking(_ args: [String], stdin: String?) -> GHResult {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["gh"] + args
+        ProcessLauncher.configure(process, executable: "gh", arguments: args)
 
         let outPipe = Pipe()
         let errPipe = Pipe()

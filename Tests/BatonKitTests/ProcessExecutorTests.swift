@@ -1,3 +1,6 @@
+#if !os(Windows)
+// Windows is best-effort: these tests spawn subprocesses (git / POSIX coreutils
+// like echo, cat / a /bin/sh fixture) that are unavailable on the Windows runner.
 @testable import BatonKit
 import Foundation
 import Testing
@@ -65,3 +68,4 @@ struct ProcessExecutorTests {
         }
     }
 }
+#endif

@@ -34,6 +34,8 @@ struct ScopeDiscoveryTests {
         })
     }
 
+    // Creating symlinks requires elevated privileges / Developer Mode on Windows.
+    #if !os(Windows)
     @Test("symlinked directories are not descended")
     func symlinkNotFollowed() throws {
         try withTempRepo({ root in
@@ -51,6 +53,7 @@ struct ScopeDiscoveryTests {
             #expect(!result.scopes.contains { $0.path.contains("link") })
         })
     }
+    #endif
 
     @Test("auto-discovered skills are attached to their scope")
     func autoSkills() throws {

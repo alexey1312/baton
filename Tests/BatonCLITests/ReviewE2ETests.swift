@@ -1,3 +1,6 @@
+#if !os(Windows)
+// Windows is best-effort: these tests spawn subprocesses (git / POSIX coreutils
+// like echo, cat / a /bin/sh fixture) that are unavailable on the Windows runner.
 import ArgumentParser
 @testable import BatonCLI
 import BatonKit
@@ -89,3 +92,4 @@ struct ReviewE2ETests {
         }
     }
 }
+#endif

@@ -1,5 +1,10 @@
 # Baton
 
+[![CI](https://github.com/alexey1312/swift-baton/actions/workflows/ci.yml/badge.svg)](https://github.com/alexey1312/swift-baton/actions/workflows/ci.yml)
+[![Release](https://github.com/alexey1312/swift-baton/actions/workflows/release.yml/badge.svg)](https://github.com/alexey1312/swift-baton/actions/workflows/release.yml)
+[![Docs](https://github.com/alexey1312/swift-baton/actions/workflows/deploy-docc.yml/badge.svg)](https://alexey1312.github.io/baton/documentation/batoncli)
+[![License](https://img.shields.io/github/license/alexey1312/swift-baton.svg)](LICENSE)
+
 Baton runs AI code review across a monorepo, one scope at a time. Each subtree keeps its own
 `baton.toml`, and the settings cascade down the tree with the closest one winning, so the iOS
 code and the backend code can use different agents, models, skills, and standards. The name

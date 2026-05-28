@@ -24,8 +24,7 @@ public struct ProcessExecutor: Sendable {
 
     private static func runBlocking(_ invocation: ProcessInvocation, agentName: String) throws -> ProcessResult {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [invocation.executable] + invocation.arguments
+        ProcessLauncher.configure(process, executable: invocation.executable, arguments: invocation.arguments)
         process.currentDirectoryURL = invocation.workingDirectory
         if !invocation.environment.isEmpty {
             process.environment = invocation.environment

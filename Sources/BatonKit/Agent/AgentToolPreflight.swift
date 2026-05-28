@@ -8,13 +8,20 @@ public enum AgentToolPreflight {
         _ binary: String,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
-        if binary.contains("/") {
+        if binary.contains("/") || binary.contains("\\") {
             return FileManager.default.isExecutableFile(atPath: binary)
         }
+        #if os(Windows)
+        let separator: Character = ";"
+        let extensions = (environment["PATHEXT"] ?? ".COM;.EXE;.BAT;.CMD").split(separator: ";").map(String.init)
+        let path = environment["Path"] ?? environment["PATH"] ?? ""
+        #else
+        let separator: Character = ":"
+        let extensions = [""]
         let path = environment["PATH"] ?? ""
-        for directory in path.split(separator: ":") {
-            let candidate = "\(directory)/\(binary)"
-            if FileManager.default.isExecutableFile(atPath: candidate) {
+        #endif
+        for directory in path.split(separator: separator) {
+            for ext in extensions where FileManager.default.isExecutableFile(atPath: "\(directory)/\(binary)\(ext)") {
                 return true
             }
         }

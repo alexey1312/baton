@@ -10,10 +10,10 @@ enum TTYDetector {
     /// Current terminal width in columns, defaulting to 80.
     static var terminalWidth: Int {
         #if os(macOS) || os(Linux)
-            var size = winsize()
-            if ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), &size) == 0, size.ws_col > 0 {
-                return Int(size.ws_col)
-            }
+        var size = winsize()
+        if ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), &size) == 0, size.ws_col > 0 {
+            return Int(size.ws_col)
+        }
         #endif
         return 80
     }

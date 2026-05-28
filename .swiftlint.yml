@@ -44,6 +44,11 @@ function_body_length:
   warning: 60
   error: 100
 
+# Test files group many cases per capability; source files stay well under 320 lines.
+file_length:
+  warning: 600
+  error: 1200
+
 type_body_length:
   warning: 300
   error: 800

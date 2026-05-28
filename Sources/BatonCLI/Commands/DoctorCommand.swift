@@ -81,8 +81,7 @@ struct DoctorCommand: AsyncParsableCommand {
 
     private func ghAuthenticated() -> Bool {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["gh", "auth", "status"]
+        ProcessLauncher.configure(process, executable: "gh", arguments: ["auth", "status"])
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         do {

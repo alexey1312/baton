@@ -26,8 +26,7 @@ public struct GitRunner: Sendable {
     /// a non-zero exit.
     public func capture(_ arguments: [String]) throws -> Output {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [executable] + arguments
+        ProcessLauncher.configure(process, executable: executable, arguments: arguments)
         process.currentDirectoryURL = repoRoot
 
         let outPipe = Pipe()
