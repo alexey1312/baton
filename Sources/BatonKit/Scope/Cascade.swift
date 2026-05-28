@@ -17,6 +17,7 @@ public enum Cascade {
         let skills = resolveSkills(chain, &prov)
         let reviews = resolveReviews(chain, &prov)
         let security = resolveSecurity(chain, &prov)
+        let learn = resolveLearn(chain, &prov)
 
         // A scope with reviews must have a resolvable agent block.
         if !reviews.isEmpty, agent == nil {
@@ -42,6 +43,7 @@ public enum Cascade {
             skills: skills,
             reviews: reviews,
             security: security,
+            learn: learn,
             provenance: prov
         )
     }
@@ -144,6 +146,41 @@ public enum Cascade {
         guard let root = chain.first, let security = root.config.security else { return nil }
         prov.record("security", .file(root.configPath))
         return security
+    }
+
+    private static func resolveLearn(
+        _ chain: [ScopeConfig],
+        _ prov: inout ConfigProvenance
+    ) -> EffectiveLearn {
+        var result = EffectiveLearn()
+        // Analysis fields cascade field-by-field, closest-wins (like `[defaults]`).
+        for scope in chain {
+            guard let learn = scope.config.learn else { continue }
+            let file = ProvenanceSource.file(scope.configPath)
+            if let v = learn.lookbackDays { result.lookbackDays = v; prov.record("learn.lookback_days", file) }
+            if let v = learn.minSignal { result.minSignal = v; prov.record("learn.min_signal", file) }
+            if let v = learn.enabled { result.enabled = v; prov.record("learn.enabled", file) }
+        }
+        // Delivery fields are read only from the repository-root scope (chain head).
+        if let root = chain.first, let learn = root.config.learn {
+            resolveLearnDelivery(learn, configPath: root.configPath, into: &result, &prov)
+        }
+        return result
+    }
+
+    private static func resolveLearnDelivery(
+        _ learn: LearnConfig,
+        configPath: String,
+        into result: inout EffectiveLearn,
+        _ prov: inout ConfigProvenance
+    ) {
+        let file = ProvenanceSource.file(configPath)
+        if let v = learn.branch { result.branch = v; prov.record("learn.branch", file) }
+        if let v = learn.base { result.base = v; prov.record("learn.base", file) }
+        if let v = learn.reviewers { result.reviewers = v; prov.record("learn.reviewers", file) }
+        if let v = learn.teamReviewers { result.teamReviewers = v; prov.record("learn.team_reviewers", file) }
+        if let v = learn.labels { result.labels = v; prov.record("learn.labels", file) }
+        if let v = learn.draft { result.draft = v; prov.record("learn.draft", file) }
     }
 
     private static func displayPath(_ path: String) -> String {

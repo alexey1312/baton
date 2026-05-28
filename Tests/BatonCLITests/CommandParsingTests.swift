@@ -34,6 +34,19 @@ struct CommandParsingTests {
         #expect(cmd.format == .githubSummary)
     }
 
+    @Test("learn parses apply/markdown/gh-repo/repo with preview as default")
+    func learnOptions() throws {
+        let preview = try LearnCommand.parse([])
+        #expect(!preview.apply)
+        #expect(!preview.markdown)
+
+        let cmd = try LearnCommand.parse(["--apply", "--markdown", "--gh-repo", "o/r", "--repo", "/tmp/x"])
+        #expect(cmd.apply)
+        #expect(cmd.markdown)
+        #expect(cmd.ghRepo == "o/r")
+        #expect(cmd.repo == "/tmp/x")
+    }
+
     @Test("an unknown subcommand is rejected")
     func unknownSubcommand() {
         #expect(throws: (any Error).self) {

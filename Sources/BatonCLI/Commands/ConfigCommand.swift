@@ -71,7 +71,22 @@ struct ConfigCommand: AsyncParsableCommand {
                 lines.append("  \(review.name)\(provenance("reviews.\(review.name)", config))")
             }
         }
+        lines.append(contentsOf: formatLearn(config))
         return lines.joined(separator: "\n")
+    }
+
+    private func formatLearn(_ config: EffectiveConfig) -> [String] {
+        let learn = config.learn
+        var lines = ["[learn]"]
+        lines.append("  enabled = \(learn.enabled)\(provenance("learn.enabled", config))")
+        lines.append("  lookback_days = \(learn.lookbackDays)\(provenance("learn.lookback_days", config))")
+        lines.append("  min_signal = \(learn.minSignal)\(provenance("learn.min_signal", config))")
+        // Delivery fields are repository-global; show them on the root scope only.
+        guard config.scopePath.isEmpty else { return lines }
+        lines.append("  branch = \(learn.branch)\(provenance("learn.branch", config))")
+        if let base = learn.base { lines.append("  base = \(base)\(provenance("learn.base", config))") }
+        lines.append("  draft = \(learn.draft)\(provenance("learn.draft", config))")
+        return lines
     }
 
     private func provenance(_ key: String, _ config: EffectiveConfig) -> String {

@@ -18,6 +18,26 @@ public enum BatonMarker {
         guard let end = rest.range(of: " -->") else { return nil }
         return String(rest[..<end.lowerBound]).trimmingCharacters(in: .whitespaces)
     }
+
+    /// Reconstruct a finding's identity from a Baton inline comment `body` plus the
+    /// `file`/`line` the comment is anchored to. Parses the bold header
+    /// `**<badge> <severity> — <title>**` written by ``GitHubPresentation``.
+    /// Returns `nil` when the body is not a Baton finding header.
+    public static func parseFinding(body: String, file: String, line: Int?) -> FindingIdentity? {
+        guard body.contains(finding) else { return nil }
+        let header = body
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .first { $0.contains(" — ") }
+            .map(String.init)
+        guard let header else { return nil }
+        let stripped = header.replacingOccurrences(of: "*", with: "")
+        guard let separator = stripped.range(of: " — ") else { return nil }
+        let left = String(stripped[..<separator.lowerBound])
+        let title = String(stripped[separator.upperBound...]).trimmingCharacters(in: .whitespaces)
+        let severity = Severity.allCases.first { left.contains($0.rawValue) } ?? .medium
+        guard !title.isEmpty else { return nil }
+        return FindingIdentity(file: file, line: line, title: title, severity: severity)
+    }
 }
 
 /// A finding rendered as a PR inline review comment.

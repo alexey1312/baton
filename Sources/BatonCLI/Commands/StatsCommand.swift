@@ -36,7 +36,8 @@ struct StatsCommand: AsyncParsableCommand {
                 repoId: context.repoId, scope: scope, review: review, since: parseSince()
             )
             let stats = StatsRepository(connection: context.database.connection)
-            let payload = try gather(stats: stats, filter: filter)
+            let feedback = FeedbackRepository(connection: context.database.connection)
+            let payload = try gather(stats: stats, feedback: feedback, repoId: context.repoId, filter: filter)
             if json {
                 try emitJSON(payload)
             } else {
@@ -47,15 +48,22 @@ struct StatsCommand: AsyncParsableCommand {
 
     // MARK: - Gather
 
-    private func gather(stats: StatsRepository, filter: StatsFilter) throws -> StatsPayload {
+    private func gather(
+        stats: StatsRepository,
+        feedback: FeedbackRepository,
+        repoId: String?,
+        filter: StatsFilter
+    ) throws -> StatsPayload {
         let summary = try stats.summary(filter: filter)
         let byReview = try stats.byReview(filter: filter)
         let bySeverity = try stats.bySeverity(filter: filter)
         let topFiles = try stats.topFiles(filter: filter, limit: 10)
         let costByModel = try stats.costByModel(filter: filter)
-        return StatsPayload(
+        return try StatsPayload(
             summary: summary, byReview: byReview, bySeverity: bySeverity,
-            topFiles: topFiles, costByModel: costByModel
+            topFiles: topFiles, costByModel: costByModel,
+            mostDownvoted: feedback.mostDownvoted(repoId: repoId),
+            mostUpvoted: feedback.mostUpvoted(repoId: repoId)
         )
     }
 
@@ -77,6 +85,24 @@ struct StatsCommand: AsyncParsableCommand {
         emitBySeverity(payload.bySeverity)
         emitTopFiles(payload.topFiles)
         emitCostByModel(payload.costByModel)
+        emitFeedback(payload.mostDownvoted, payload.mostUpvoted)
+    }
+
+    private func emitFeedback(_ down: [FeedbackRow], _ up: [FeedbackRow]) {
+        guard !down.isEmpty || !up.isEmpty else { return }
+        TerminalOutput.shared.out("\n  Learn Feedback\n  \(line)")
+        emitFeedbackRows("Most downvoted (👎)", down)
+        emitFeedbackRows("Most upvoted (👍)", up)
+    }
+
+    private func emitFeedbackRows(_ title: String, _ rows: [FeedbackRow]) {
+        guard !rows.isEmpty else { return }
+        TerminalOutput.shared.out("  \(title)")
+        for row in rows {
+            let label = TextTable.truncate("\(row.severity) \(row.title)", 44)
+            let weight = row.weight > 0 ? "+\(row.weight)" : String(row.weight)
+            TerminalOutput.shared.out("  " + TextTable.pad(label, 46) + TextTable.lpad(weight, 6))
+        }
     }
 
     private func emitSummary(_ summary: StatsSummary) {
@@ -179,6 +205,8 @@ private struct StatsPayload {
     var bySeverity: [SeverityStat]
     var topFiles: [FileStat]
     var costByModel: [ModelCostStat]
+    var mostDownvoted: [FeedbackRow]
+    var mostUpvoted: [FeedbackRow]
 }
 
 /// JSON shape exposed by `baton stats --json`. Kept as a private mirror of the
@@ -190,6 +218,8 @@ private struct StatsOutput: Codable {
     var bySeverity: [SeverityJSON]
     var topFiles: [FileJSON]
     var costByModel: [ModelCostJSON]
+    var mostDownvoted: [FeedbackJSON]
+    var mostUpvoted: [FeedbackJSON]
 
     private enum CodingKeys: String, CodingKey {
         case summary
@@ -197,6 +227,8 @@ private struct StatsOutput: Codable {
         case bySeverity = "by_severity"
         case topFiles = "top_files"
         case costByModel = "cost_by_model"
+        case mostDownvoted = "most_downvoted"
+        case mostUpvoted = "most_upvoted"
     }
 
     static func from(_ payload: StatsPayload) -> StatsOutput {
@@ -205,8 +237,33 @@ private struct StatsOutput: Codable {
             byReview: payload.byReview.map(ReviewJSON.init),
             bySeverity: payload.bySeverity.map(SeverityJSON.init),
             topFiles: payload.topFiles.map(FileJSON.init),
-            costByModel: payload.costByModel.map(ModelCostJSON.init)
+            costByModel: payload.costByModel.map(ModelCostJSON.init),
+            mostDownvoted: payload.mostDownvoted.map(FeedbackJSON.init),
+            mostUpvoted: payload.mostUpvoted.map(FeedbackJSON.init)
         )
+    }
+}
+
+private struct FeedbackJSON: Codable {
+    var file: String
+    var line: Int?
+    var title: String
+    var severity: String
+    var weight: Int
+    var threadCount: Int
+
+    init(_ row: FeedbackRow) {
+        file = row.file
+        line = row.line
+        title = row.title
+        severity = row.severity
+        weight = row.weight
+        threadCount = row.threadCount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case file, line, title, severity, weight
+        case threadCount = "thread_count"
     }
 }
 

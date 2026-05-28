@@ -15,15 +15,24 @@ struct MigrationsTests {
         #expect(row != nil)
     }
 
-    @Test("run applies v1 once and is idempotent on a second call")
+    @Test("run applies all migrations once and is idempotent on a second call")
     func idempotent() throws {
         let db = try Connection(.inMemory)
+        let latest = Migrations.all.map(\.version).max() ?? 0
         try Migrations.run(on: db)
-        #expect(try Migrations.currentVersion(db) == 1)
+        #expect(try Migrations.currentVersion(db) == latest)
 
         // Running again must be a no-op (no throw, no version bump).
         try Migrations.run(on: db)
-        #expect(try Migrations.currentVersion(db) == 1)
+        #expect(try Migrations.currentVersion(db) == latest)
+    }
+
+    @Test("the feedback cache table is created by v2")
+    func feedbackTableExists() throws {
+        let db = try Connection(.inMemory)
+        try Migrations.run(on: db)
+        let sql = "SELECT name FROM sqlite_master WHERE type='table' AND name='feedback'"
+        #expect(try db.prepare(sql).makeIterator().next() != nil)
     }
 
     @Test("currentVersion throws when schema_version is not an integer")

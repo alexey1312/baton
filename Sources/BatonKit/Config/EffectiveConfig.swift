@@ -63,6 +63,47 @@ public struct EffectiveDefaults: Equatable, Sendable {
     }
 }
 
+/// The fully resolved `[learn]` values for a scope.
+///
+/// Analysis fields (``lookbackDays``, ``minSignal``, ``enabled``) are resolved
+/// closest-wins from the scope's chain; delivery fields are resolved only from the
+/// repository-root scope (one rolling PR per repository).
+public struct EffectiveLearn: Equatable, Sendable {
+    // Analysis (cascading).
+    public var lookbackDays: Int
+    public var minSignal: Int
+    public var enabled: Bool
+    // Delivery (root-only).
+    public var branch: String
+    public var base: String?
+    public var reviewers: [String]
+    public var teamReviewers: [String]
+    public var labels: [String]
+    public var draft: Bool
+
+    public init(
+        lookbackDays: Int = ConfigDefaults.learnLookbackDays,
+        minSignal: Int = ConfigDefaults.learnMinSignal,
+        enabled: Bool = ConfigDefaults.learnEnabled,
+        branch: String = ConfigDefaults.learnBranch,
+        base: String? = nil,
+        reviewers: [String] = [],
+        teamReviewers: [String] = [],
+        labels: [String] = [],
+        draft: Bool = ConfigDefaults.learnDraft
+    ) {
+        self.lookbackDays = lookbackDays
+        self.minSignal = minSignal
+        self.enabled = enabled
+        self.branch = branch
+        self.base = base
+        self.reviewers = reviewers
+        self.teamReviewers = teamReviewers
+        self.labels = labels
+        self.draft = draft
+    }
+}
+
 /// The effective configuration computed for a single scope after the cascade.
 public struct EffectiveConfig: Sendable {
     /// Repo-relative scope root (`""` for the repository root).
@@ -77,6 +118,8 @@ public struct EffectiveConfig: Sendable {
     public var reviews: [ReviewConfig]
     /// Root-only security policy.
     public var security: SecurityConfig?
+    /// Resolved `[learn]` block (analysis cascades, delivery root-only).
+    public var learn: EffectiveLearn
     /// Provenance for `config --explain`.
     public var provenance: ConfigProvenance
 
@@ -87,6 +130,7 @@ public struct EffectiveConfig: Sendable {
         skills: [SkillConfig],
         reviews: [ReviewConfig],
         security: SecurityConfig?,
+        learn: EffectiveLearn = EffectiveLearn(),
         provenance: ConfigProvenance
     ) {
         self.scopePath = scopePath
@@ -95,6 +139,7 @@ public struct EffectiveConfig: Sendable {
         self.skills = skills
         self.reviews = reviews
         self.security = security
+        self.learn = learn
         self.provenance = provenance
     }
 

@@ -4,7 +4,7 @@ import SQLite
 import Testing
 
 struct BatonDatabaseTests {
-    @Test("openInMemory bootstraps schema v1 with all expected tables and indices")
+    @Test("openInMemory bootstraps the latest schema with all expected tables and indices")
     func openInMemoryBootstrapsSchema() throws {
         let db = try BatonDatabase.openInMemory()
 
@@ -13,6 +13,7 @@ struct BatonDatabaseTests {
         #expect(tables.contains("runs"))
         #expect(tables.contains("tasks"))
         #expect(tables.contains("findings"))
+        #expect(tables.contains("feedback"))
 
         let indices = try indexNames(db.connection)
         for expected in [
@@ -29,7 +30,7 @@ struct BatonDatabaseTests {
             #expect(indices.contains(expected), "missing index \(expected)")
         }
 
-        #expect(try db.schemaVersion() == 1)
+        #expect(try db.schemaVersion() == (Migrations.all.map(\.version).max() ?? 0))
     }
 
     @Test("foreign_keys pragma is on after open")

@@ -23,6 +23,7 @@ struct Baton: AsyncParsableCommand {
             StatsCommand.self,
             HistoryCommand.self,
             ShowCommand.self,
+            LearnCommand.self,
         ]
     )
 

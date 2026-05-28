@@ -9,6 +9,8 @@ enum CLIError: BatonError {
     case namedReviewMissing(name: String, available: [String])
     case noRunsRecorded
     case invalidDate(value: String)
+    case learnRepoUnresolvable
+    case learnDeliveryFailed(detail: String)
 
     var errorDescription: String? {
         switch self {
@@ -22,6 +24,10 @@ enum CLIError: BatonError {
             "No runs are recorded for this repository yet"
         case let .invalidDate(value):
             "Invalid date: '\(value)'"
+        case .learnRepoUnresolvable:
+            "Could not determine the target repository for `baton learn`."
+        case let .learnDeliveryFailed(detail):
+            "Delivering the learn pull request failed: \(detail)"
         }
     }
 
@@ -39,6 +45,10 @@ enum CLIError: BatonError {
             "Run `baton review` first, or pass --all-repos to look across every repo."
         case .invalidDate:
             "Use ISO-8601 yyyy-MM-dd format, e.g. 2026-05-28."
+        case .learnRepoUnresolvable:
+            "Pass --gh-repo owner/repo, or run inside GitHub Actions where GITHUB_REPOSITORY is set."
+        case .learnDeliveryFailed:
+            "Inspect the git/gh error above, verify push access to the learn branch, and re-run."
         }
     }
 }

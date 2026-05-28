@@ -152,6 +152,65 @@ struct CascadeTests {
         #expect(eff.referencesBudgetBytes == 512 * 1024)
     }
 
+    // MARK: - Learn block
+
+    @Test("learn analysis field overridden closest-wins, others inherited")
+    func learnAnalysisCascade() throws {
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            learn: LearnConfig(lookbackDays: 14, minSignal: 3)
+        ))
+        let c = scope("ios", BatonConfig(learn: LearnConfig(minSignal: 5)))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.learn.minSignal == 5) // child override
+        #expect(eff.learn.lookbackDays == 14) // inherited from root
+    }
+
+    @Test("learn delivery fields are honored only at the root")
+    func learnDeliveryRootOnly() throws {
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            learn: LearnConfig(branch: "learn", reviewers: ["alice"])
+        ))
+        let c = scope("ios", BatonConfig(learn: LearnConfig(branch: "child-learn", reviewers: ["bob"])))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.learn.branch == "learn") // root delivery wins
+        #expect(eff.learn.reviewers == ["alice"]) // child delivery ignored
+    }
+
+    @Test("learn enabled = false opts a scope out")
+    func learnOptOut() throws {
+        let r = root(BatonConfig(agent: AgentConfig(kind: .claude), learn: LearnConfig(enabled: true)))
+        let c = scope("ios", BatonConfig(learn: LearnConfig(enabled: false)))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.learn.enabled == false)
+    }
+
+    @Test("learn enabled defaults to true when unset anywhere in the chain")
+    func learnEnabledDefaultsTrue() throws {
+        let c = scope("ios", BatonConfig(agent: AgentConfig(kind: .claude)))
+        let eff = try Cascade.effective(for: c, in: [c])
+        #expect(eff.learn.enabled == true)
+        #expect(eff.learn.lookbackDays == 14)
+        #expect(eff.learn.minSignal == 1)
+        #expect(eff.learn.branch == "learn")
+        #expect(eff.learn.draft == true)
+    }
+
+    @Test("learn provenance attributes analysis and delivery sources")
+    func learnProvenance() throws {
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            learn: LearnConfig(branch: "learn", lookbackDays: 30)
+        ))
+        let c = scope("ios", BatonConfig(learn: LearnConfig(minSignal: 5)))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.provenance.source(for: "learn.lookback_days") == .file("baton.toml"))
+        #expect(eff.provenance.source(for: "learn.min_signal") == .file("ios/baton.toml"))
+        #expect(eff.provenance.source(for: "learn.branch") == .file("baton.toml"))
+        #expect(eff.provenance.source(for: "learn.enabled") == .builtinDefault)
+    }
+
     // MARK: - Provenance
 
     @Test("provenance attributes each effective value to its source")

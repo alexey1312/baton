@@ -33,3 +33,10 @@ Findings are `low`, `medium`, or `high`. A review fails (non-zero CLI exit) when
 meets or exceeds its effective `fail_on`. The Check Run conclusion is a separate, high-gated
 signal — see above.
 
+## The 👍/👎 usefulness signal
+
+The `<!-- baton:finding -->` marker and the "React 👍 / 👎 if useful" affordance on every
+`github-review` inline comment are not only for dedupe — they are the usefulness signal that
+`baton learn` reads back from merged PRs (👍/👎 reactions plus thread resolution) to propose
+improvements to the review setup. See <doc:Learn>.
+

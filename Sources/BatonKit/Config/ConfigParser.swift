@@ -19,7 +19,7 @@ public struct ParsedConfig: Sendable {
 /// invalid enum values such as an unknown `[agent].kind`.
 public enum ConfigParser {
     private static let knownTopLevel: Set<String> = [
-        "agent", "defaults", "skills", "reviews", "disabled_reviews", "security",
+        "agent", "defaults", "skills", "reviews", "disabled_reviews", "security", "learn",
     ]
     private static let knownAgent: Set<String> = ["kind", "model", "binary", "args", "context"]
     private static let knownDefaults: Set<String> = [
@@ -31,6 +31,10 @@ public enum ConfigParser {
     ]
     private static let knownSecurity: Set<String> = [
         "require_pinned_skills", "allowed_skill_sources", "references_budget_kb",
+    ]
+    private static let knownLearn: Set<String> = [
+        "branch", "base", "reviewers", "team_reviewers", "labels", "draft",
+        "lookback_days", "min_signal", "enabled",
     ]
 
     /// Parse `baton.toml` text from the file at `path`.
@@ -105,6 +109,8 @@ public enum ConfigParser {
                 warnings += unknown(fields, known: knownDefaults, prefix: "defaults", path: path)
             case let ("security", .table(fields)):
                 warnings += unknown(fields, known: knownSecurity, prefix: "security", path: path)
+            case let ("learn", .table(fields)):
+                warnings += unknown(fields, known: knownLearn, prefix: "learn", path: path)
             case let ("skills", .array(entries)):
                 warnings += unknownInArray(entries, known: knownSkill, prefix: "skills", path: path)
             case let ("reviews", .array(entries)):

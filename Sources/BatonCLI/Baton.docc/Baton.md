@@ -33,14 +33,15 @@ Windows support on a best-effort basis.
 - <doc:Usage>
 - <doc:Configuration>
 - <doc:OutputFormats>
+- <doc:Learn>
 
 ### Commands
-
-Baton exposes six commands:
 
 - **`baton init`** — scaffold a starter `baton.toml` for a scope.
 - **`baton review`** — route the diff to scopes and run the configured agents, producing findings.
 - **`baton config`** — show the effective configuration for a scope (use `--explain` for provenance).
 - **`baton render`** — render a saved run to the terminal, markdown, or JSON without re-running the agent.
 - **`baton publish`** — publish a saved run to GitHub as a PR review and Check Runs.
+- **`baton learn`** — propose review-setup edits from recent 👍/👎 + thread signal as a rolling draft PR.
+- **`baton stats`** / **`baton history`** / **`baton show`** — inspect aggregated and per-run review history.
 - **`baton doctor`** — check that the required external tools (`git`, the agent CLI, `gh`) are present and authenticated.

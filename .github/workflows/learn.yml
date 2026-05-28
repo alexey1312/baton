@@ -1,0 +1,78 @@
+name: Learn
+
+# `baton learn` runs unattended on a schedule (and on demand). It reads 👍/👎 +
+# thread-resolution signal from recently merged PRs and opens/updates a single
+# rolling draft PR proposing edits to Baton's own review setup.
+#
+# Token caveat: opening/updating the PR needs a token with `pull-requests: write`
+# AND `contents: write`. The Actions `GITHUB_TOKEN` (a GitHub App token) qualifies.
+# A plain PAT without those scopes degrades the run to preview output plus a
+# warning rather than failing — mirroring the Check Run caveat in `baton publish`.
+
+on:
+  schedule:
+    # Weekly, Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Open/update the rolling draft PR (false = preview only)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: baton-learn
+  cancel-in-progress: false
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  learn:
+    name: Reflect on review signal
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.3
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y curl git gh
+
+      - uses: actions/checkout@v6
+        with:
+          # Full history so the rolling `learn` branch can be force-updated.
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: jdx/mise-action@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build baton
+        run: swift build -c release
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # The configured agent CLI (claude/codex/gemini/opencode) and its credentials
+      # must be present for delivery; without them `learn` still previews safely.
+      - name: Run baton learn
+        env:
+          # `schedule` events have no inputs, so default to apply; `workflow_dispatch`
+          # honors the boolean input. Passed via env to avoid run-script injection.
+          APPLY: ${{ github.event.inputs.apply || 'true' }}
+        run: |
+          if [ "$APPLY" = "false" ]; then
+            .build/release/baton learn
+          else
+            .build/release/baton learn --apply
+          fi

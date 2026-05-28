@@ -83,3 +83,31 @@ require_pinned_skills = true                          # remote skills must set `
 allowed_skill_sources = ["org/*", "trusted/skills"]   # glob allowlist of remote sources
 ```
 
+### [learn]
+
+Configures `baton learn` (see <doc:Learn>). The block has a **split cascade**: *analysis*
+fields cascade field-by-field, closest-wins (like `[defaults]`), so a busy scope can demand more
+signal and a quiet one can widen its window or opt out; *delivery* fields are read **only from
+the repository-root scope** and are not inherited — there is one rolling pull request per
+repository.
+
+```toml
+[learn]
+# Analysis (cascading, closest-wins per scope):
+enabled       = true     # default true — false opts a scope out entirely
+lookback_days = 14       # window of merged PRs to scan (default 14)
+min_signal    = 1        # min attributed Baton-thread count before proposing (default 1)
+
+# Delivery (root scope only; ignored on descendants):
+branch         = "learn"          # rolling PR branch (default "learn")
+base           = "main"           # PR base branch
+draft          = true             # open as a draft (default true)
+reviewers      = ["alice"]        # optional requested reviewers
+team_reviewers = ["platform"]     # optional requested team reviewers
+labels         = ["automation"]   # optional PR labels
+```
+
+When `enabled` is unset anywhere in a scope's chain it defaults to `true`, so `learn` runs in
+preview with no `[learn]` block at all; *delivery still requires the root delivery fields* (or
+`--apply`).
+

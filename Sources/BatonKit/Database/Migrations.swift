@@ -18,6 +18,7 @@ public enum Migrations {
     /// All known migrations, in ascending version order.
     public static let all: [Migration] = [
         Migration(version: 1, sql: ddlV1),
+        Migration(version: 2, sql: ddlV2),
     ]
 
     /// Reads the current schema version from `meta`, or `0` if no row exists.
@@ -133,5 +134,24 @@ public enum Migrations {
     CREATE INDEX IF NOT EXISTS idx_findings_run ON findings(run_id);
     CREATE INDEX IF NOT EXISTS idx_findings_sev ON findings(severity);
     CREATE INDEX IF NOT EXISTS idx_findings_file ON findings(file);
+    """
+
+    /// Schema v2: the optional, non-authoritative `learn` feedback cache, keyed by
+    /// finding identity `hash(file, line, title, severity)` per repository. Powers
+    /// `baton stats` trends only — never required by a `learn` run.
+    private static let ddlV2: String = """
+    CREATE TABLE IF NOT EXISTS feedback(
+        repo_id      TEXT NOT NULL,
+        finding_id   TEXT NOT NULL,
+        file         TEXT NOT NULL,
+        line         INTEGER,
+        title        TEXT NOT NULL,
+        severity     TEXT NOT NULL CHECK(severity IN ('low','medium','high')),
+        weight       INTEGER NOT NULL DEFAULT 0,
+        thread_count INTEGER NOT NULL DEFAULT 0,
+        last_seen_at REAL NOT NULL,
+        PRIMARY KEY (repo_id, finding_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_feedback_repo_weight ON feedback(repo_id, weight);
     """
 }

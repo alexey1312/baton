@@ -10,6 +10,7 @@ public struct BatonConfig: Codable, Equatable, Sendable {
     public var reviews: [ReviewConfig]?
     public var disabledReviews: [String]?
     public var security: SecurityConfig?
+    public var learn: LearnConfig?
 
     public init(
         agent: AgentConfig? = nil,
@@ -17,7 +18,8 @@ public struct BatonConfig: Codable, Equatable, Sendable {
         skills: [SkillConfig]? = nil,
         reviews: [ReviewConfig]? = nil,
         disabledReviews: [String]? = nil,
-        security: SecurityConfig? = nil
+        security: SecurityConfig? = nil,
+        learn: LearnConfig? = nil
     ) {
         self.agent = agent
         self.defaults = defaults
@@ -25,10 +27,11 @@ public struct BatonConfig: Codable, Equatable, Sendable {
         self.reviews = reviews
         self.disabledReviews = disabledReviews
         self.security = security
+        self.learn = learn
     }
 
     enum CodingKeys: String, CodingKey {
-        case agent, defaults, skills, reviews, security
+        case agent, defaults, skills, reviews, security, learn
         case disabledReviews = "disabled_reviews"
     }
 }
@@ -173,5 +176,53 @@ public struct SecurityConfig: Codable, Equatable, Sendable {
         case requirePinnedSkills = "require_pinned_skills"
         case allowedSkillSources = "allowed_skill_sources"
         case referencesBudgetKb = "references_budget_kb"
+    }
+}
+
+/// The `[learn]` block. Split cascade: delivery fields (`branch`, `base`,
+/// `reviewers`, `team_reviewers`, `labels`, `draft`) are read only from the
+/// repository-root scope; analysis fields (`lookback_days`, `min_signal`,
+/// `enabled`) cascade field-by-field, closest-wins, like `[defaults]`.
+public struct LearnConfig: Codable, Equatable, Sendable {
+    // Delivery (root-only): there is one rolling PR per repository.
+    public var branch: String?
+    public var base: String?
+    public var reviewers: [String]?
+    public var teamReviewers: [String]?
+    public var labels: [String]?
+    public var draft: Bool?
+    // Analysis (cascading closest-wins).
+    public var lookbackDays: Int?
+    public var minSignal: Int?
+    public var enabled: Bool?
+
+    public init(
+        branch: String? = nil,
+        base: String? = nil,
+        reviewers: [String]? = nil,
+        teamReviewers: [String]? = nil,
+        labels: [String]? = nil,
+        draft: Bool? = nil,
+        lookbackDays: Int? = nil,
+        minSignal: Int? = nil,
+        enabled: Bool? = nil
+    ) {
+        self.branch = branch
+        self.base = base
+        self.reviewers = reviewers
+        self.teamReviewers = teamReviewers
+        self.labels = labels
+        self.draft = draft
+        self.lookbackDays = lookbackDays
+        self.minSignal = minSignal
+        self.enabled = enabled
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case branch, base, reviewers, labels, draft
+        case teamReviewers = "team_reviewers"
+        case lookbackDays = "lookback_days"
+        case minSignal = "min_signal"
+        case enabled
     }
 }

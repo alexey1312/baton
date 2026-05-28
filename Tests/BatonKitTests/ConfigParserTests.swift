@@ -62,6 +62,40 @@ struct ConfigParserTests {
         #expect(parsed.warnings.isEmpty)
     }
 
+    @Test("parses the [learn] block with snake_case keys")
+    func parsesLearn() throws {
+        let toml = """
+        [learn]
+        branch = "learn"
+        base = "main"
+        reviewers = ["alice"]
+        team_reviewers = ["platform"]
+        labels = ["automation"]
+        draft = false
+        lookback_days = 30
+        min_signal = 5
+        enabled = false
+        """
+        let parsed = try ConfigParser.parse(toml, path: "baton.toml")
+        let learn = parsed.config.learn
+        #expect(learn?.branch == "learn")
+        #expect(learn?.base == "main")
+        #expect(learn?.reviewers == ["alice"])
+        #expect(learn?.teamReviewers == ["platform"])
+        #expect(learn?.labels == ["automation"])
+        #expect(learn?.draft == false)
+        #expect(learn?.lookbackDays == 30)
+        #expect(learn?.minSignal == 5)
+        #expect(learn?.enabled == false)
+        #expect(parsed.warnings.isEmpty)
+    }
+
+    @Test("unknown learn keys are ignored with a warning")
+    func unknownLearnKey() throws {
+        let parsed = try ConfigParser.parse("[learn]\nfrobnicate = true\n", path: "baton.toml")
+        #expect(parsed.warnings.contains { $0.contains("'learn.frobnicate'") })
+    }
+
     @Test("unknown agent kind hard-fails with valid-kinds recovery")
     func invalidKind() {
         #expect(throws: ConfigError.self) {

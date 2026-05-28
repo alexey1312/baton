@@ -19,7 +19,7 @@ struct OutputModeTests {
         let names = Baton.configuration.subcommands.map { $0.configuration.commandName ?? "" }
         #expect(Set(names) == [
             "init", "review", "config", "render", "publish", "doctor",
-            "stats", "history", "show",
+            "stats", "history", "show", "learn",
         ])
     }
 }
