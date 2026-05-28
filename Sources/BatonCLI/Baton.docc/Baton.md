@@ -30,6 +30,9 @@ Windows support on a best-effort basis.
 ### Essentials
 
 - <doc:GettingStarted>
+- <doc:Usage>
+- <doc:Configuration>
+- <doc:OutputFormats>
 
 ### Commands
 

@@ -12,9 +12,12 @@ Baton runs AI code review across a monorepo, one scope at a time. Each subtree k
 code and the backend code can use different agents, models, skills, and standards. The name
 comes from a conductor's baton: it directs the reviewers, it doesn't play.
 
+## Overview
+
 Baton has no model of its own. It finds the scopes, routes the diff to the deepest one that
 owns each file, runs the configured reviews through external coding CLIs, and either prints
-the findings or posts them to a GitHub pull request.
+the findings or posts them to a GitHub pull request. The full documentation is at
+<https://alexey1312.github.io/baton>.
 
 ## Features
 
@@ -26,7 +29,33 @@ the findings or posts them to a GitHub pull request.
   off at a byte count.
 - Remote skills must be pinned to a commit SHA and matched against an allowlist, and their
   markdown enters the prompt as untrusted reference data rather than instructions.
-- Posts resolvable inline comments and one Check Run per `(scope, review)` through the `gh` CLI.
+- Posts resolvable inline comments and one Check Run per `(scope, review)` through the `gh`
+  CLI, with the saved run kept on disk for re-rendering without re-running the agent.
+
+## Installation
+
+### mise (recommended)
+
+```sh
+mise use -g github:alexey1312/swift-baton
+```
+
+### Homebrew
+
+```sh
+brew install alexey1312/tap/baton
+```
+
+### Build from source
+
+```sh
+git clone https://github.com/alexey1312/swift-baton.git
+cd swift-baton
+swift build -c release
+.build/release/baton --help
+```
+
+Requires Swift 6.3 and macOS 13+.
 
 ## Quick start
 
@@ -41,15 +70,28 @@ baton publish                                         # post findings to the Git
 `baton review security` runs a single review. `--base origin/main` sets the diff base, and
 `--json` prints machine-readable findings.
 
-## Install
+## Platform support
+
+Builds and runs on macOS, Linux, and Windows. Prebuilt archives for each platform are attached
+to every tagged release.
+
+## Development
+
+Tooling is pinned through [mise](https://mise.jdx.dev). Run `mise install` once to fetch the
+toolchain (Swift 6.3, SwiftLint, SwiftFormat, dprint, hk, actionlint, git-cliff). Then:
 
 ```sh
-mise use -g github:alexey1312/swift-baton   # mise (recommended)
-brew install alexey1312/tap/baton           # Homebrew
+mise run build        # debug build
+mise run test         # full test suite
+mise run lint         # SwiftLint --strict + actionlint
+mise run format       # SwiftFormat + dprint fmt
+mise run docs         # generate the DocC site at ./docs
 ```
 
-From source (Swift 6.3, macOS 13+): `swift build -c release && .build/release/baton --help`.
+Capabilities live under `openspec/specs/`; new work goes through a fresh OpenSpec change
+(`openspec change add <name>`, then `openspec validate <name> --strict`). Completed changes
+are archived under `openspec/changes/archive/`.
 
-Builds on macOS, Linux, and Windows. Prebuilt archives are on the
-[Releases](https://github.com/alexey1312/swift-baton/releases) page, and full docs are at
-<https://alexey1312.github.io/baton>.
+## License
+
+[MIT](LICENSE).
