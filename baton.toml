@@ -11,7 +11,5 @@ name = "swift-style"
 skills = ["swift-style"]
 glob = ["**/*.swift"]
 prompt = """
-Review the diff for violations of the Airbnb Swift style guide attached as the reference skill.
-Report concrete style violations as findings; flag only issues actually covered by the guide.
-Focus on the changed lines (the `+` lines in the diff).
+Review the added (`+`) lines in the diff against the attached Swift style guide. Emit a finding for each rule the code violates, citing the rule. Return {"findings": []} if nothing violates.
 """
