@@ -16,4 +16,13 @@ public enum Severity: String, Codable, CaseIterable, Comparable, Sendable {
     public static func < (lhs: Severity, rhs: Severity) -> Bool {
         lhs.rank < rhs.rank
     }
+
+    /// An emoji badge for markdown/GitHub rendering.
+    public var badge: String {
+        switch self {
+        case .low: "🟢"
+        case .medium: "🟡"
+        case .high: "🔴"
+        }
+    }
 }
