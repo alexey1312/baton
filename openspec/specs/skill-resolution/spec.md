@@ -170,3 +170,23 @@ The system SHALL surface a typed error carrying a `recoverySuggestion` for every
 - **WHEN** a skill path inside a cloned skill repository resolves, via a symlink, to a location outside its skill directory
 - **THEN** resolution SHALL reject that path with a typed error carrying a `recoverySuggestion` to remove the escaping symlink or point the skill at a path within its skill directory
 
+### Requirement: Configurable Inlined References Budget
+
+The system SHALL cap the cumulative size of inlined supporting markdown per skill at a byte budget that defaults to 1 MiB and is overridable via the repository-root `[security].references_budget_kb` (expressed in kilobytes), failing resolution with a typed error carrying a `recoverySuggestion` when a skill's inlined references exceed the effective budget.
+
+#### Scenario: Default budget applies when references_budget_kb is unset
+
+- **WHEN** the root scope does not set `references_budget_kb`
+- **AND** a skill's inlined supporting markdown totals more than 256 KiB but at most 1 MiB
+- **THEN** the system SHALL inline the references and resolve the skill
+
+#### Scenario: Configured budget overrides the default
+
+- **WHEN** the root `baton.toml` sets `[security].references_budget_kb`
+- **THEN** the system SHALL use that value (converted to bytes) as the per-skill references budget instead of the 1 MiB default
+
+#### Scenario: References exceeding the effective budget are rejected
+
+- **WHEN** a skill's cumulative inlined supporting markdown exceeds the effective references budget
+- **THEN** resolution SHALL fail with a typed error carrying a `recoverySuggestion` to raise `references_budget_kb`, narrow the skill via `subpath`, drop unused references, or split the bundle
+

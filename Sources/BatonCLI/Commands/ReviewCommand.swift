@@ -68,7 +68,12 @@ struct ReviewCommand: AsyncParsableCommand {
             }
 
             let plans = buildPlans(effectives: effectives, diff: diff, scopes: discovery.scopes, root: root)
-            let tasks = try await orchestrate(plans: plans, root: root, git: git)
+            let tasks = try await orchestrate(
+                plans: plans,
+                root: root,
+                git: git,
+                referencesBudgetBytes: rootReferencesBudget(effectives)
+            )
             let reviewOutcome = ReviewOutcome(results: tasks.map(\.result))
             let status: RunStatus = reviewOutcome.shouldFailExit ? .failed : .success
             let hook = RunRecordStore.DatabaseHook(
@@ -123,12 +128,18 @@ struct ReviewCommand: AsyncParsableCommand {
         }
     }
 
-    private func orchestrate(plans: [ScopePlan], root: URL, git: GitRunner) async throws -> [CompletedTask] {
+    private func orchestrate(
+        plans: [ScopePlan],
+        root: URL,
+        git: GitRunner,
+        referencesBudgetBytes: Int
+    ) async throws -> [CompletedTask] {
         let resolver = SkillResolver(
             repoRoot: root,
             cacheDir: SkillResolver.defaultCacheDir(),
             git: git,
-            allowUnpinned: allowUnpinned
+            allowUnpinned: allowUnpinned,
+            referencesBudgetBytes: referencesBudgetBytes
         )
         let orchestrator = ReviewOrchestrator(repoRoot: root, agent: LiveReviewAgent(), skills: resolver)
         return try await orchestrator.run(scopes: plans, options: .init(
@@ -160,6 +171,11 @@ struct ReviewCommand: AsyncParsableCommand {
 
     private func rootDefaults(_ effectives: [EffectiveConfig]) -> EffectiveDefaults? {
         (effectives.first { $0.scopePath.isEmpty } ?? effectives.first)?.defaults
+    }
+
+    private func rootReferencesBudget(_ effectives: [EffectiveConfig]) -> Int {
+        (effectives.first { $0.scopePath.isEmpty } ?? effectives.first)?.referencesBudgetBytes
+            ?? ConfigDefaults.referencesBudgetBytes
     }
 
     private func emitWarnings(_ warnings: [String]) {

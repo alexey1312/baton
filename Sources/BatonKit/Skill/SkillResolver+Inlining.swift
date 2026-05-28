@@ -1,12 +1,6 @@
 import Foundation
 
 extension SkillResolver {
-    /// Cumulative byte budget for inlined supporting markdown per skill. Baton sends the
-    /// resolved body to a headless agent (`claude --print`, codex/gemini/opencode); an
-    /// unbounded walk could silently fill the context window or OOM the agent. The
-    /// budget is unconditional — narrow the skill via `subpath` or split the bundle.
-    static let referencesBudgetBytes: Int = 256 * 1024
-
     /// `SKILL.md` first, then `README.md`. `nil` when neither exists.
     func bodyFileURL(in dir: URL, fileManager: FileManager) -> URL? {
         for candidate in ["SKILL.md", "README.md"] {
@@ -101,10 +95,10 @@ extension SkillResolver {
             guard values.isRegularFile == true else { continue }
             let content = try readReference(standardized, skillName: skillName)
             totalBytes += content.utf8.count
-            if totalBytes > Self.referencesBudgetBytes {
+            if totalBytes > referencesBudgetBytes {
                 throw SkillError.referencesBudgetExceeded(
                     name: skillName,
-                    limitBytes: Self.referencesBudgetBytes
+                    limitBytes: referencesBudgetBytes
                 )
             }
             collected.append((relativeMarkdownLabel(of: standardized, within: skillDir), content))

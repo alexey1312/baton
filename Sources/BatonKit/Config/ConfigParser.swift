@@ -29,7 +29,9 @@ public enum ConfigParser {
     private static let knownReview: Set<String> = [
         "name", "skills", "glob", "fail_on", "context", "prompt", "prompt_file",
     ]
-    private static let knownSecurity: Set<String> = ["require_pinned_skills", "allowed_skill_sources"]
+    private static let knownSecurity: Set<String> = [
+        "require_pinned_skills", "allowed_skill_sources", "references_budget_kb",
+    ]
 
     /// Parse `baton.toml` text from the file at `path`.
     public static func parse(_ text: String, path: String) throws -> ParsedConfig {

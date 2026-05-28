@@ -16,4 +16,7 @@ public enum ConfigDefaults {
     public static let context: ReviewContext = .diff
     /// Whether remote skills must be SHA-pinned.
     public static let requirePinnedSkills = true
+    /// Per-skill byte budget for inlined supporting markdown (1 MiB) when
+    /// `[security].references_budget_kb` is unset.
+    public static let referencesBudgetBytes = 1024 * 1024
 }

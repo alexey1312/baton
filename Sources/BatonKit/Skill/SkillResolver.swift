@@ -17,6 +17,11 @@ public struct SkillResolver: Sendable {
     private let git: GitRunner
     /// Whether `--allow-unpinned` was passed, bypassing mandatory SHA pinning.
     private let allowUnpinned: Bool
+    /// Cumulative byte budget for inlined supporting markdown per skill. Baton sends the
+    /// resolved body to a headless agent (`claude --print`, codex/gemini/opencode); an
+    /// unbounded walk could silently fill the context window or OOM the agent. Configurable
+    /// via `[security].references_budget_kb`; narrow the skill via `subpath` or split the bundle.
+    let referencesBudgetBytes: Int
     /// Maps an `owner/repo` reference to a clone URL. Overridable for testing.
     private let urlMapping: @Sendable (_ owner: String, _ repo: String) -> String
 
@@ -24,13 +29,15 @@ public struct SkillResolver: Sendable {
         repoRoot: URL,
         cacheDir: URL,
         git: GitRunner,
-        allowUnpinned: Bool = false
+        allowUnpinned: Bool = false,
+        referencesBudgetBytes: Int = ConfigDefaults.referencesBudgetBytes
     ) {
         self.init(
             repoRoot: repoRoot,
             cacheDir: cacheDir,
             git: git,
             allowUnpinned: allowUnpinned,
+            referencesBudgetBytes: referencesBudgetBytes,
             urlMapping: { owner, repo in "https://github.com/\(owner)/\(repo).git" }
         )
     }
@@ -42,12 +49,14 @@ public struct SkillResolver: Sendable {
         cacheDir: URL,
         git: GitRunner,
         allowUnpinned: Bool = false,
+        referencesBudgetBytes: Int = ConfigDefaults.referencesBudgetBytes,
         urlMapping: @escaping @Sendable (_ owner: String, _ repo: String) -> String
     ) {
         self.repoRoot = repoRoot
         self.cacheDir = cacheDir
         self.git = git
         self.allowUnpinned = allowUnpinned
+        self.referencesBudgetBytes = referencesBudgetBytes
         self.urlMapping = urlMapping
     }
 
@@ -343,34 +352,6 @@ public struct SkillResolver: Sendable {
     }
 
     // MARK: - File helpers
-
-    func readBody(_ url: URL, skillName: String) throws -> String {
-        do {
-            return try String(contentsOf: url, encoding: .utf8)
-        } catch {
-            throw SkillError.missingSkillFile(name: skillName, searchedPath: url.deletingLastPathComponent().path)
-        }
-    }
-
-    /// Reject `url` when its symlink-resolved canonical path falls outside `base`,
-    /// when the path is dangling (resolved target does not exist), or when any
-    /// intermediate component cannot be canonicalised. `resolvingSymlinksInPath()`
-    /// can return the input unchanged for a dangling target, so the existence
-    /// check is required to close that gap.
-    func assertNoSymlinkEscape(_ url: URL, within base: URL, skillName: String) throws {
-        let resolved = url.resolvingSymlinksInPath().standardizedFileURL
-        let resolvedBase = base.resolvingSymlinksInPath().standardizedFileURL
-        if !FileManager.default.fileExists(atPath: resolved.path) {
-            throw SkillError.symlinkEscape(name: skillName, path: resolved.path)
-        }
-        var basePath = resolvedBase.path
-        if !basePath.hasSuffix("/") {
-            basePath += "/"
-        }
-        guard resolved.path == resolvedBase.path || resolved.path.hasPrefix(basePath) else {
-            throw SkillError.symlinkEscape(name: skillName, path: resolved.path)
-        }
-    }
 
     /// Whether `git` is invokable (independent of the repository working directory).
     ///

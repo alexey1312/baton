@@ -156,14 +156,22 @@ public struct ReviewConfig: Codable, Equatable, Sendable {
 public struct SecurityConfig: Codable, Equatable, Sendable {
     public var requirePinnedSkills: Bool?
     public var allowedSkillSources: [String]?
+    /// Per-skill budget, in kilobytes, for inlined supporting markdown.
+    public var referencesBudgetKb: Int?
 
-    public init(requirePinnedSkills: Bool? = nil, allowedSkillSources: [String]? = nil) {
+    public init(
+        requirePinnedSkills: Bool? = nil,
+        allowedSkillSources: [String]? = nil,
+        referencesBudgetKb: Int? = nil
+    ) {
         self.requirePinnedSkills = requirePinnedSkills
         self.allowedSkillSources = allowedSkillSources
+        self.referencesBudgetKb = referencesBudgetKb
     }
 
     enum CodingKeys: String, CodingKey {
         case requirePinnedSkills = "require_pinned_skills"
         case allowedSkillSources = "allowed_skill_sources"
+        case referencesBudgetKb = "references_budget_kb"
     }
 }

@@ -6,11 +6,15 @@ import Foundation
 import Testing
 
 /// Build a local-only resolver rooted at `root` (cache and `remotes/` siblings).
-private func localResolver(_ root: URL) -> SkillResolver {
+private func localResolver(
+    _ root: URL,
+    referencesBudgetBytes: Int = ConfigDefaults.referencesBudgetBytes
+) -> SkillResolver {
     SkillTestFixtures.resolver(
         repoRoot: root,
         cacheDir: root.appendingPathComponent("cache"),
-        remotesRoot: root
+        remotesRoot: root,
+        referencesBudgetBytes: referencesBudgetBytes
     )
 }
 
@@ -436,19 +440,19 @@ struct SkillSupportingMarkdownEdgeCaseTests {
         }
     }
 
-    @Test("cumulative references exceeding the byte budget are rejected")
+    @Test("cumulative references exceeding the configured byte budget are rejected")
     func referencesBudgetExceeded() throws {
         try SkillTestFixtures.withTempDir { root in
             let dir = root.appendingPathComponent("skills/x", isDirectory: true)
             try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
             let refs = dir.appendingPathComponent("references", isDirectory: true)
-            // Two ~200 KB files sum to ~400 KB > 256 KB cap.
+            // Two ~200 KB files sum to ~400 KB > the configured 256 KB budget.
             let chunk = String(repeating: "x", count: 200 * 1024)
             try SkillTestFixtures.writeFile(refs, "a.md", chunk)
             try SkillTestFixtures.writeFile(refs, "b.md", chunk)
 
             do {
-                _ = try localResolver(root).resolve(
+                _ = try localResolver(root, referencesBudgetBytes: 256 * 1024).resolve(
                     SkillConfig(name: "x", source: "./skills/x"),
                     declaringConfigDir: root,
                     security: nil
@@ -461,6 +465,28 @@ struct SkillSupportingMarkdownEdgeCaseTests {
                 }
                 #expect(limitBytes == 256 * 1024)
             }
+        }
+    }
+
+    @Test("the default budget (1 MiB) admits references the old 256 KB cap rejected")
+    func defaultBudgetAdmitsLargeReferences() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            let refs = dir.appendingPathComponent("references", isDirectory: true)
+            // ~400 KB total: over the legacy 256 KB cap, comfortably under the 1 MiB default.
+            let chunk = String(repeating: "x", count: 200 * 1024)
+            try SkillTestFixtures.writeFile(refs, "a.md", chunk)
+            try SkillTestFixtures.writeFile(refs, "b.md", chunk)
+
+            let resolved = try localResolver(root).resolve(
+                SkillConfig(name: "x", source: "./skills/x"),
+                declaringConfigDir: root,
+                security: nil
+            )
+
+            #expect(resolved.body.contains("## Reference: references/a"))
+            #expect(resolved.body.contains("## Reference: references/b"))
         }
     }
 

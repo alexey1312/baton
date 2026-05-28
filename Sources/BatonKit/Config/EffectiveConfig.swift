@@ -102,4 +102,10 @@ public struct EffectiveConfig: Sendable {
     public var requirePinnedSkills: Bool {
         security?.requirePinnedSkills ?? ConfigDefaults.requirePinnedSkills
     }
+
+    /// The effective per-skill references byte budget: root security
+    /// `references_budget_kb` converted to bytes, else ``ConfigDefaults/referencesBudgetBytes``.
+    public var referencesBudgetBytes: Int {
+        (security?.referencesBudgetKb).map { $0 * 1024 } ?? ConfigDefaults.referencesBudgetBytes
+    }
 }

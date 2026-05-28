@@ -82,7 +82,8 @@ public enum SkillError: BatonError {
         case .referenceReadFailed:
             "Ensure the file exists, is UTF-8 encoded, and is readable by the current user."
         case .referencesBudgetExceeded:
-            "Narrow the skill source with `subpath`, drop unused references, or split the bundle."
+            "Raise `references_budget_kb` in [security], narrow the skill source with `subpath`," +
+                " drop unused references, or split the bundle."
         }
     }
 }

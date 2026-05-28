@@ -50,13 +50,15 @@ enum SkillTestFixtures {
         repoRoot: URL,
         cacheDir: URL,
         remotesRoot: URL,
-        allowUnpinned: Bool = false
+        allowUnpinned: Bool = false,
+        referencesBudgetBytes: Int = ConfigDefaults.referencesBudgetBytes
     ) -> SkillResolver {
         SkillResolver(
             repoRoot: repoRoot,
             cacheDir: cacheDir,
             git: GitRunner(repoRoot: repoRoot),
             allowUnpinned: allowUnpinned,
+            referencesBudgetBytes: referencesBudgetBytes,
             urlMapping: { owner, repo in
                 let path = remotesRoot
                     .appendingPathComponent(owner, isDirectory: true)

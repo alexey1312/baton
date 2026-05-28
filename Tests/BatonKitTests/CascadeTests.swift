@@ -138,6 +138,20 @@ struct CascadeTests {
         #expect(eff.security?.allowedSkillSources == ["org/*"])
     }
 
+    @Test("references budget defaults to 1 MiB and honors security.references_budget_kb")
+    func referencesBudget() throws {
+        let dflt = root(BatonConfig(agent: AgentConfig(kind: .claude)))
+        let effDefault = try Cascade.effective(for: dflt, in: [dflt])
+        #expect(effDefault.referencesBudgetBytes == 1024 * 1024)
+
+        let configured = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            security: SecurityConfig(referencesBudgetKb: 512)
+        ))
+        let eff = try Cascade.effective(for: configured, in: [configured])
+        #expect(eff.referencesBudgetBytes == 512 * 1024)
+    }
+
     // MARK: - Provenance
 
     @Test("provenance attributes each effective value to its source")

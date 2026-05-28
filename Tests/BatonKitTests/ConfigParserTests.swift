@@ -52,6 +52,16 @@ struct ConfigParserTests {
         #expect(parsed.warnings.isEmpty)
     }
 
+    @Test("parses security.references_budget_kb")
+    func parsesReferencesBudget() throws {
+        let parsed = try ConfigParser.parse(
+            "[security]\nreferences_budget_kb = 512\n",
+            path: "baton.toml"
+        )
+        #expect(parsed.config.security?.referencesBudgetKb == 512)
+        #expect(parsed.warnings.isEmpty)
+    }
+
     @Test("unknown agent kind hard-fails with valid-kinds recovery")
     func invalidKind() {
         #expect(throws: ConfigError.self) {
