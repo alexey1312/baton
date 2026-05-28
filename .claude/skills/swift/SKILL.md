@@ -25,6 +25,17 @@ description: Always use when creating and editing Swift files (*.swift)
 
 - Don't use `self` unless it's necessary for disambiguation or required by the language.
 
+  ```swift
+  // ❌ — unnecessary `self`
+  func greet() -> String { "Hello, " + self.name }
+  // ✅
+  func greet() -> String { "Hello, " + name }
+  // ✅ — `self` is required to disambiguate the parameter from the property
+  init(name: String) { self.name = name }
+  // ✅ — `self` is required to escape an explicit closure capture
+  doLater { [self] in self.refresh() }
+  ```
+
 - Name members of tuples for extra clarity. Rule of thumb: if you've got more than 3 fields, you should probably be using a struct.
 
 - Prefer using `for` loops over the functional `forEach(…)` method, unless using `forEach(…)` as the last element in a functional chain.
@@ -53,7 +64,20 @@ description: Always use when creating and editing Swift files (*.swift)
 
 - Avoid global functions whenever possible. Prefer methods within type definitions.
 
-- Prefer immutable values whenever possible. Use `map` and `compactMap` instead of appending to a new collection. Use `filter` instead of removing elements from a mutable collection.
+- Prefer immutable values whenever possible. Use `map` and `compactMap` instead of appending to a new collection. Use `filter` instead of removing elements from a mutable collection. Properties that are assigned in `init` and never reassigned later must be `let`, not `var`.
+
+  ```swift
+  // ❌ — `name` is never reassigned after `init`
+  final class Greeter {
+      var name: String
+      init(name: String) { self.name = name }
+  }
+  // ✅
+  final class Greeter {
+      let name: String
+      init(name: String) { self.name = name }
+  }
+  ```
 
 - Prefer immutable or computed static properties over mutable ones whenever possible. Use stored `static let` properties or computed `static var` properties over stored `static var` properties whenever possible, as stored `static var` properties are global mutable state.
 
