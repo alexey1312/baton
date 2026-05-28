@@ -156,7 +156,7 @@ struct StatsCommand: AsyncParsableCommand {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
         guard let date = formatter.date(from: since) else {
-            throw CLIError.repoNotFound(path: "(--since '\(since)' must be yyyy-MM-dd)")
+            throw CLIError.invalidDate(value: since)
         }
         return date
     }

@@ -45,7 +45,7 @@ struct ShowCommand: AsyncParsableCommand {
         guard runId == "latest" else { return runId }
         let recent = try history.recentRuns(repoId: repoId, limit: 1)
         if let first = recent.first { return first.runId }
-        throw CLIError.namedReviewMissing(name: "latest", available: [])
+        throw CLIError.noRunsRecorded
     }
 
     private func emitJSON(_ detail: RunDetail) throws {

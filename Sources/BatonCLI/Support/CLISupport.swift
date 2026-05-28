@@ -7,6 +7,8 @@ enum CLIError: BatonError {
     case repoNotFound(path: String)
     case notAGitRepository(path: String)
     case namedReviewMissing(name: String, available: [String])
+    case noRunsRecorded
+    case invalidDate(value: String)
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +18,10 @@ enum CLIError: BatonError {
             "Not a git repository: \(path)"
         case let .namedReviewMissing(name, _):
             "No review named '\(name)' is defined in any scope"
+        case .noRunsRecorded:
+            "No runs are recorded for this repository yet"
+        case let .invalidDate(value):
+            "Invalid date: '\(value)'"
         }
     }
 
@@ -29,6 +35,10 @@ enum CLIError: BatonError {
             available.isEmpty
                 ? "Define a [[reviews]] entry in a baton.toml."
                 : "Available reviews: \(available.joined(separator: ", "))."
+        case .noRunsRecorded:
+            "Run `baton review` first, or pass --all-repos to look across every repo."
+        case .invalidDate:
+            "Use ISO-8601 yyyy-MM-dd format, e.g. 2026-05-28."
         }
     }
 }
