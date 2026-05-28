@@ -49,4 +49,4 @@ that slice; findings render locally or publish to a GitHub PR via `gh`.
 - Commit directly to `main`, granular Conventional Commits. Automated commits use `HK=0 git commit` (hooks validated separately).
 - After a chunk: `swiftformat` → `swiftlint --strict` → `swift test` (through xcsift), commit, push, then `gh run watch <id>` to verify CI.
 - Tooling/CI scaffolding is ported from the ExFig project at `/Users/aleksei/Developer/ExFig` — compare against it when CI/tooling misbehaves.
-- OpenSpec change `add-baton-mvp` tracks the MVP tasks (`openspec validate add-baton-mvp --strict`).
+- Capabilities live in `openspec/specs/` (the MVP change is archived under `openspec/changes/archive/`). New work goes through a fresh OpenSpec change.
