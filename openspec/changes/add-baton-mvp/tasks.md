@@ -100,13 +100,13 @@
 
 ## 11. Validation
 
-- [ ] 11.1 `openspec validate add-baton-mvp --strict` passes
-- [ ] 11.2 `swift build` / `swift test` green on macOS and Linux (piped through xcsift)
+- [x] 11.1 `openspec validate add-baton-mvp --strict` passes
+- [x] 11.2 `swift build` / `swift test` green on macOS and Linux (piped through xcsift)
 - [ ] 11.3 README quick start verified against a sample monorepo fixture
 
 ## 12. Tooling, CI, documentation & distribution (port from ExFig)
 
-- [ ] 12.1 `mise.toml`: pin tools (swift 6.3, swiftlint, swiftformat, dprint, hk, actionlint, git-cliff, xcsift) + tasks (`build`/`test`/`lint`/`format`/`format-check`/`docs`/`changelog`); commit `mise.lock`
+- [x] 12.1 `mise.toml`: pin tools (swift 6.3, swiftlint, swiftformat, dprint, hk, actionlint, git-cliff, xcsift) + tasks (`build`/`test`/`lint`/`format`/`format-check`/`docs`/`changelog`); commit `mise.lock`
 - [x] 12.2 `hk.pkl` + `.githooks/`: `pre-commit` (swiftformat, swiftlint --strict, dprint, actionlint; auto-fix + restage) and `commit-msg` (conventional commits); delegate via `mise x -- hk run`; honor `HK=0`; align hk pin between `mise.toml` and `hk.pkl`
 - [ ] 12.3 Linter/formatter configs: `.swiftlint.yml`, `.swiftformat`, `dprint.json` (drop ExFig PKL/llms-specific bits)
 - [x] 12.4 CI `ci.yml`: triggers push `main` + PR, concurrency-cancel; `lint` job (`format-check` + `lint` + `actionlint`) → `build-macos` + `build-linux` (swift:6.3, xcsift, `.build` cache) + `build-windows` (best-effort)
