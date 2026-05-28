@@ -33,21 +33,41 @@ git-cliff = "2.12.0"   # Changelog generation
 # Build & test
 # =============================================================================
 
+# Tasks that pipe through xcsift use an explicit bash shebang + pipefail so a
+# failed swift/swiftlint command propagates (the Linux default `sh` is dash, which
+# rejects `set -o pipefail`, and a bare pipe would return xcsift's exit code).
+
 [tasks.build]
 description = "Build the Swift package (debug)"
-run = "swift build 2>&1 | xcsift -f toon"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+swift build 2>&1 | xcsift -f toon
+"""
 
 [tasks."build:release"]
 description = "Build the Swift package (release)"
-run = "swift build --configuration release 2>&1 | xcsift -f toon"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+swift build --configuration release 2>&1 | xcsift -f toon
+"""
 
 [tasks.test]
 description = "Run all tests"
-run = "swift test 2>&1 | xcsift -f toon"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+swift test 2>&1 | xcsift -f toon
+"""
 
 [tasks."test:filter"]
 description = "Run tests matching a filter (usage: mise run test:filter BatonKitTests)"
-run = "swift test --filter {{arg(name='filter')}} 2>&1 | xcsift -f toon"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+swift test --filter {{arg(name='filter')}} 2>&1 | xcsift -f toon
+"""
 
 # =============================================================================
 # Lint & format
@@ -56,7 +76,9 @@ run = "swift test --filter {{arg(name='filter')}} 2>&1 | xcsift -f toon"
 [tasks.lint]
 description = "Run SwiftLint (strict) and actionlint"
 run = """
-swiftlint lint --strict Sources Tests 2>&1 | xcsift -f toon
+#!/usr/bin/env bash
+set -euo pipefail
+swiftlint lint --strict Sources Tests
 actionlint
 """
 
@@ -86,7 +108,8 @@ dprint fmt
 [tasks.format-check]
 description = "Check all formatting (CI)"
 run = """
-set -o pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 swiftformat Sources Tests --lint
 dprint check
 """
