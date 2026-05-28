@@ -100,7 +100,9 @@ struct ShowCommand: AsyncParsableCommand {
         TerminalOutput.shared.out("  \(TextTable.pad(label, 14))\(value)")
     }
 
-    private var line: String { "─────────────────────────────────────────────" }
+    private var line: String {
+        "─────────────────────────────────────────────"
+    }
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()

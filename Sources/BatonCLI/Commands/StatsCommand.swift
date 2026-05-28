@@ -148,7 +148,9 @@ struct StatsCommand: AsyncParsableCommand {
         TerminalOutput.shared.out("  \(TextTable.pad(label, 18))\(value)")
     }
 
-    private var line: String { "─────────────────────────────────────────────" }
+    private var line: String {
+        "─────────────────────────────────────────────"
+    }
 
     private func parseSince() throws -> Date? {
         guard let since else { return nil }
@@ -263,13 +265,17 @@ private struct ReviewJSON: Codable {
 private struct SeverityJSON: Codable {
     var severity: String
     var count: Int
-    init(_ stat: SeverityStat) { severity = stat.severity; count = stat.count }
+    init(_ stat: SeverityStat) {
+        severity = stat.severity; count = stat.count
+    }
 }
 
 private struct FileJSON: Codable {
     var file: String
     var count: Int
-    init(_ stat: FileStat) { file = stat.file; count = stat.count }
+    init(_ stat: FileStat) {
+        file = stat.file; count = stat.count
+    }
 }
 
 private struct ModelCostJSON: Codable {
