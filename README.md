@@ -78,7 +78,8 @@ to every tagged release.
 ## Development
 
 Tooling is pinned through [mise](https://mise.jdx.dev). Run `mise install` once to fetch the
-toolchain (Swift 6.3, SwiftLint, SwiftFormat, dprint, hk, actionlint, git-cliff). Then:
+toolchain (Swift 6.3, SwiftLint, SwiftFormat, dprint, hk, actionlint, git-cliff), then
+`mise run setup` to wire up the git hooks under `.githooks/`. Then:
 
 ```sh
 mise run build        # debug build

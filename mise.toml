@@ -30,6 +30,23 @@ actionlint = "1.7.11"  # GitHub Actions linting
 git-cliff = "2.12.0"   # Changelog generation
 
 # =============================================================================
+# Onboarding
+# =============================================================================
+
+# Idempotent project bootstrap. Mainly wires up git hooks for fresh clones —
+# the `[hooks] enter` block above only fires when mise shell-activation is set up
+# globally, so contributors who use `mise x` / `mise run` without `mise activate`
+# need an explicit one-shot to install hooks. Safe to rerun.
+[tasks.setup]
+description = "One-time project setup (configures git hooks, etc.)"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+git config core.hooksPath .githooks
+echo "✓ git hooks installed (core.hooksPath = .githooks)"
+"""
+
+# =============================================================================
 # Build & test
 # =============================================================================
 
