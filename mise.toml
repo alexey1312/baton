@@ -36,13 +36,19 @@ git-cliff = "2.12.0"   # Changelog generation
 # Tasks that pipe through xcsift use an explicit bash shebang + pipefail so a
 # failed swift/swiftlint command propagates (the Linux default `sh` is dash, which
 # rejects `set -o pipefail`, and a bare pipe would return xcsift's exit code).
+# xcsift is output-prettification only and has no Linux build, so these tasks fall
+# back to plain swift when it is absent (CI correctness comes from swift's exit).
 
 [tasks.build]
 description = "Build the Swift package (debug)"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
-swift build 2>&1 | xcsift -f toon
+if command -v xcsift >/dev/null 2>&1; then
+  swift build 2>&1 | xcsift -f toon
+else
+  swift build
+fi
 """
 
 [tasks."build:release"]
@@ -50,7 +56,11 @@ description = "Build the Swift package (release)"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
-swift build --configuration release 2>&1 | xcsift -f toon
+if command -v xcsift >/dev/null 2>&1; then
+  swift build --configuration release 2>&1 | xcsift -f toon
+else
+  swift build --configuration release
+fi
 """
 
 [tasks.test]
@@ -58,7 +68,11 @@ description = "Run all tests"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
-swift test 2>&1 | xcsift -f toon
+if command -v xcsift >/dev/null 2>&1; then
+  swift test 2>&1 | xcsift -f toon
+else
+  swift test
+fi
 """
 
 [tasks."test:filter"]
@@ -66,7 +80,11 @@ description = "Run tests matching a filter (usage: mise run test:filter BatonKit
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
-swift test --filter {{arg(name='filter')}} 2>&1 | xcsift -f toon
+if command -v xcsift >/dev/null 2>&1; then
+  swift test --filter {{arg(name='filter')}} 2>&1 | xcsift -f toon
+else
+  swift test --filter {{arg(name='filter')}}
+fi
 """
 
 # =============================================================================
