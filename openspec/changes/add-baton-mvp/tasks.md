@@ -33,12 +33,12 @@
 
 ## 4. agent-execution
 
-- [ ] 4.1 `ProcessExecutor` (concurrent stderr read, termination handler before run, timeout) — port from ExFig
-- [ ] 4.2 `AgentRunner` protocol + uniform `makeInvocation` (binary/args honored for ALL agents — blick PR #20)
-- [ ] 4.3 Adapters: claude, codex, gemini, opencode — pin per-CLI headless flags (claude `--print --output-format json --max-turns 1 --dangerously-skip-permissions`; gemini `--approval-mode=yolo --skip-trust`; opencode `run`), prompt via stdin, model flag (+ strip `provider/` prefix), parser
-- [ ] 4.4 Isolation: fresh temp working dir (not the repo tree, no working-tree writes) + prompt instruction to use only provided material; `context = "repo"` adds a repo copy; network egress NOT blocked (agent needs its model)
-- [ ] 4.6 Enforce per-invocation `timeout` (from effective `[defaults].timeout`, default 600s) in `ProcessExecutor`
-- [ ] 4.5 Tests: invocation building (binary/args override, args rejection cases), prompt delivery, parsing
+- [x] 4.1 `ProcessExecutor` (concurrent stderr read, termination handler before run, timeout) — port from ExFig
+- [x] 4.2 `AgentRunner` protocol + uniform `makeInvocation` (binary/args honored for ALL agents — blick PR #20)
+- [x] 4.3 Adapters: claude, codex, gemini, opencode — pin per-CLI headless flags (claude `--print --output-format json --max-turns 1 --dangerously-skip-permissions`; gemini `--approval-mode=yolo --skip-trust`; opencode `run`), prompt via stdin, model flag (+ strip `provider/` prefix), parser
+- [x] 4.4 Isolation: fresh temp working dir (not the repo tree, no working-tree writes) + prompt instruction to use only provided material; `context = "repo"` adds a repo copy; network egress NOT blocked (agent needs its model)
+- [x] 4.6 Enforce per-invocation `timeout` (from effective `[defaults].timeout`, default 600s) in `ProcessExecutor`
+- [x] 4.5 Tests: invocation building (binary/args override, args rejection cases), prompt delivery, parsing
 
 ## 5. skill-resolution
 
@@ -92,7 +92,7 @@
 - [x] 10.4 diff: invalid/unfetched base ref; empty diff (exit 0); rename across scope boundary (new path wins); binary & deleted files; quoted/space/unicode paths in `diff --git` headers
 - [x] 10.5 chunking: single file > budget → by-hunk fallback → whole-hunk + `truncated` flag + warning
 - [x] 10.6 focus-mode: previous review SHA unreachable (force-push) → fall back to full base diff + warn
-- [ ] 10.7 agent: binary missing / non-zero exit / exit-0-with-empty-stdout (auth/billing error on stderr) / unauthenticated / user `args` conflicting with required flags
+- [x] 10.7 agent: binary missing / non-zero exit / exit-0-with-empty-stdout (auth/billing error on stderr) / unauthenticated / user `args` conflicting with required flags
 - [ ] 10.8 skills: clone failure, missing `ref`, ref not found, missing `subpath`, symlink escape, `allowed_skill_sources` glob semantics, git unavailable
 - [ ] 10.9 orchestration: dedupe findings merged across chunks; clamp/drop invalid finding fields; sanitize scope/review names in artifact filenames; disk-write failure
 - [ ] 10.10 publish: token without write permission (fork PR), Check Run needs GitHub App token (local PAT) → degrade to PR-review-only + warn, rate limit / 5xx with backoff, stale head SHA, comment-count limits, idempotent re-run

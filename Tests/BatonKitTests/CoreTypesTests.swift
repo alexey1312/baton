@@ -16,10 +16,11 @@ struct CoreTypesTests {
         #expect(a.dedupeKey == b.dedupeKey)
     }
 
-    @Test("AgentKind lists every supported agent for help text")
+    @Test("AgentKind lists built-in agents plus the custom escape hatch")
     func agentKindHelp() {
-        #expect(AgentKind.allCases.count == 4)
-        #expect(AgentKind.listForHelp == "claude, codex, gemini, opencode")
+        #expect(AgentKind.builtIn == [.claude, .codex, .gemini, .opencode])
+        #expect(AgentKind.allCases.count == 5)
+        #expect(AgentKind.listForHelp == "claude, codex, gemini, opencode, custom")
     }
 
     @Test("Error formatter renders description and recovery")

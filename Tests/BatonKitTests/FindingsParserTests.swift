@@ -1,0 +1,82 @@
+@testable import BatonKit
+import Testing
+
+struct FindingsParserTests {
+    @Test("plain JSON array")
+    func plainArray() throws {
+        let json = #"[{"file":"a.swift","line":3,"severity":"high","title":"t","body":"b"}]"#
+        let parsed = try FindingsParser.parse(json)
+        #expect(parsed.findings.count == 1)
+        #expect(parsed.findings[0].severity == .high)
+        #expect(parsed.findings[0].line == 3)
+    }
+
+    @Test("findings payload object")
+    func payload() throws {
+        let json = #"{"findings":[{"file":"a","severity":"low","title":"t","body":"b"}]}"#
+        let parsed = try FindingsParser.parse(json)
+        #expect(parsed.findings.count == 1)
+    }
+
+    @Test("fenced json block")
+    func fenced() throws {
+        let text = """
+        Here are the findings:
+        ```json
+        [{"file":"a","severity":"medium","title":"t","body":"b"}]
+        ```
+        Done.
+        """
+        let parsed = try FindingsParser.parse(text)
+        #expect(parsed.findings.count == 1)
+        #expect(parsed.findings[0].severity == .medium)
+    }
+
+    @Test("brace-balanced extraction from surrounding prose, ignoring string braces")
+    func braceBalanced() throws {
+        let text = #"I think {"findings":[{"file":"a","severity":"low","title":"has } brace","body":"b"}]} overall."#
+        let parsed = try FindingsParser.parse(text)
+        #expect(parsed.findings.count == 1)
+        #expect(parsed.findings[0].title == "has } brace")
+    }
+
+    @Test("instructions maps to aiInstructions")
+    func instructions() throws {
+        let json = #"[{"file":"a","severity":"low","title":"t","body":"b","instructions":"do x"}]"#
+        let parsed = try FindingsParser.parse(json)
+        #expect(parsed.findings[0].aiInstructions == "do x")
+    }
+
+    @Test("invalid severity is clamped to medium with a warning")
+    func clampSeverity() throws {
+        let json = #"[{"file":"a","severity":"critical","title":"t","body":"b"}]"#
+        let parsed = try FindingsParser.parse(json)
+        #expect(parsed.findings[0].severity == .medium)
+        #expect(!parsed.warnings.isEmpty)
+    }
+
+    @Test("finding without a file is dropped with a warning")
+    func dropNoFile() throws {
+        let json = #"[{"severity":"high","title":"t","body":"b"}]"#
+        let parsed = try FindingsParser.parse(json)
+        #expect(parsed.findings.isEmpty)
+        #expect(!parsed.warnings.isEmpty)
+    }
+
+    @Test("non-JSON output throws an extraction failure")
+    func extractionFailure() {
+        #expect(throws: FindingsParser.ExtractionFailure.self) {
+            _ = try FindingsParser.parse("the agent said no, sorry")
+        }
+    }
+
+    @Test("ClaudeRunner unwraps the --output-format json envelope")
+    func claudeEnvelope() throws {
+        let inner = #"[{\"file\":\"a\",\"severity\":\"low\",\"title\":\"t\",\"body\":\"b\"}]"#
+        let envelope = #"{"type":"result","result":"\#(inner)"}"#
+        let parsed = try ClaudeRunner().parse(
+            AgentOutput(stdout: envelope, stderr: "", exitStatus: 0)
+        )
+        #expect(parsed.findings.count == 1)
+    }
+}

@@ -33,6 +33,11 @@ public struct Finding: Codable, Hashable, Sendable {
         self.aiInstructions = aiInstructions
     }
 
+    enum CodingKeys: String, CodingKey {
+        case file, line, severity, title, body
+        case aiInstructions = "instructions"
+    }
+
     /// Identity used to deduplicate findings merged across diff chunks:
     /// `(file, line, severity, title)`.
     public struct DedupeKey: Hashable, Sendable {
