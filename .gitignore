@@ -13,8 +13,8 @@ xcuserdata/
 DerivedData/
 *.xcuserstate
 
-# Baton run artifacts
-.baton/runs/
+# Baton run artifacts (run records + local history db)
+.baton/
 
 # Skill cache
 .cache/
