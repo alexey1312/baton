@@ -68,10 +68,10 @@
 
 ## 8. rendering
 
-- [ ] 8.1 `render` formats: terminal, markdown, json (local)
-- [ ] 8.2 `render` formats: github-review, check-run, github-summary (from a saved run, no LLM); github-review/check-run require `--head-sha`
-- [ ] 8.3 Severity badges, file/line, collapsible "Instructions for AI agents" block
-- [ ] 8.4 Tests: each format from a fixture run record
+- [x] 8.1 `render` formats: terminal, markdown, json (local)
+- [x] 8.2 `render` formats: github-review, check-run, github-summary (from a saved run, no LLM); github-review/check-run require `--head-sha`
+- [x] 8.3 Severity badges, file/line, collapsible "Instructions for AI agents" block
+- [x] 8.4 Tests: each format from a fixture run record
 
 ## 9. cli
 
@@ -96,7 +96,7 @@
 - [x] 10.8 skills: clone failure, missing `ref`, ref not found, missing `subpath`, symlink escape, `allowed_skill_sources` glob semantics, git unavailable
 - [x] 10.9 orchestration: dedupe findings merged across chunks; clamp/drop invalid finding fields; sanitize scope/review names in artifact filenames; disk-write failure
 - [ ] 10.10 publish: token without write permission (fork PR), Check Run needs GitHub App token (local PAT) → degrade to PR-review-only + warn, rate limit / 5xx with backoff, stale head SHA, comment-count limits, idempotent re-run
-- [ ] 10.11 render: missing/corrupt run record; dangling `latest`; zero findings emits valid output
+- [x] 10.11 render: missing/corrupt run record; dangling `latest`; zero findings emits valid output
 
 ## 11. Validation
 

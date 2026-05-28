@@ -5,6 +5,12 @@ public struct CompletedTask: Sendable {
     public var result: ReviewTaskResult
     public var prompt: String
     public var rawOutput: String
+
+    public init(result: ReviewTaskResult, prompt: String, rawOutput: String) {
+        self.result = result
+        self.prompt = prompt
+        self.rawOutput = rawOutput
+    }
 }
 
 /// Creates one task per `(scope, review)`, runs them with sliding-window
