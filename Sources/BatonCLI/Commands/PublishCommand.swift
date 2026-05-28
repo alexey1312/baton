@@ -1,11 +1,10 @@
 import ArgumentParser
+import BatonForge
 import BatonKit
 import Foundation
 
-/// `baton publish` — publish a saved run to a GitHub PR via the `gh` CLI.
-///
-/// Wired to `BatonForge.GitHubForge` once that capability lands; the command shell
-/// here resolves the run and publish context and performs the `gh` preflight.
+/// `baton publish` — publish a saved run to a GitHub PR via the `gh` CLI, using
+/// `BatonForge.GitHubForge` (PR review + Check Runs, no LLM re-invocation).
 struct PublishCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "publish",

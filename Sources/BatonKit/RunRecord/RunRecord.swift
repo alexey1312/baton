@@ -41,12 +41,28 @@ public struct RunManifest: Codable, Sendable {
     public var createdAt: Date
     public var tasks: [TaskSummary]
 
+    public init(runId: String, base: String, headSHA: String, createdAt: Date, tasks: [TaskSummary]) {
+        self.runId = runId
+        self.base = base
+        self.headSHA = headSHA
+        self.createdAt = createdAt
+        self.tasks = tasks
+    }
+
     public struct TaskSummary: Codable, Sendable {
         public var scope: String
         public var review: String
         public var findingsCount: Int
         public var failed: Bool
         public var recordFile: String
+
+        public init(scope: String, review: String, findingsCount: Int, failed: Bool, recordFile: String) {
+            self.scope = scope
+            self.review = review
+            self.findingsCount = findingsCount
+            self.failed = failed
+            self.recordFile = recordFile
+        }
     }
 }
 
@@ -55,6 +71,12 @@ public struct LoadedRun: Sendable {
     public var directory: URL
     public var manifest: RunManifest
     public var results: [ReviewTaskResult]
+
+    public init(directory: URL, manifest: RunManifest, results: [ReviewTaskResult]) {
+        self.directory = directory
+        self.manifest = manifest
+        self.results = results
+    }
 }
 
 /// Writes and reads per-run artifacts under `.baton/runs/<run-id>/`.

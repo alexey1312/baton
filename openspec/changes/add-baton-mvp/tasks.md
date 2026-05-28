@@ -59,12 +59,12 @@
 
 ## 7. github-publish
 
-- [ ] 7.1 `Forge` protocol; `GitHubForge` via `gh` CLI (preflight: `gh` present + authenticated)
-- [ ] 7.2 PR-context detection (repo, PR number, head SHA) from GH Actions env + `--gh-repo`/`--head-sha`/`--pr` overrides; no PR number → post only check runs; persist reviewed SHA (check runs + `baton:last-reviewed` marker)
-- [ ] 7.3 Post PR review (event COMMENT, empty body, inline comments in diff hunks) — resolvable
-- [ ] 7.4 Create one Check Run per `(scope, review)`; conclusion failure/success/neutral by severity
-- [ ] 7.5 Resolve review threads (GraphQL `resolveReviewThread`); dedupe already-posted comments
-- [ ] 7.6 Tests: payload building, dedupe, conclusion mapping (mock `gh`)
+- [x] 7.1 `Forge` protocol; `GitHubForge` via `gh` CLI (preflight: `gh` present + authenticated)
+- [x] 7.2 PR-context detection (repo, PR number, head SHA) from GH Actions env + `--gh-repo`/`--head-sha`/`--pr` overrides; no PR number → post only check runs; persist reviewed SHA (check runs + `baton:last-reviewed` marker)
+- [x] 7.3 Post PR review (event COMMENT, empty body, inline comments in diff hunks) — resolvable
+- [x] 7.4 Create one Check Run per `(scope, review)`; conclusion failure/success/neutral by severity
+- [x] 7.5 Resolve review threads (GraphQL `resolveReviewThread`); dedupe already-posted comments
+- [x] 7.6 Tests: payload building, dedupe, conclusion mapping (mock `gh`)
 
 ## 8. rendering
 
@@ -79,7 +79,7 @@
 - [x] 9.2 `init` — write starter `baton.toml` (`--agent`, `--model`, `--path`, `--force`)
 - [x] 9.3 `review [name]` — `--base --agent --model --json --max-concurrency --repo --allow-unpinned`
 - [x] 9.4 `config [--explain]` — print effective per-scope config with provenance
-- [ ] 9.5 `render --format` and `publish` over the latest/selected run
+- [x] 9.5 `render --format` and `publish` over the latest/selected run
 - [x] 9.6 `doctor` — check git / gh / configured agent binaries (present + authenticated), report status
 - [x] 9.7 Preflight: `review` checks the agent binary; `publish` checks `gh`; fail fast with a recovery suggestion
 - [x] 9.8 Tests: argument parsing, end-to-end on a fixture monorepo (mock agent + mock `gh`)
@@ -95,7 +95,7 @@
 - [x] 10.7 agent: binary missing / non-zero exit / exit-0-with-empty-stdout (auth/billing error on stderr) / unauthenticated / user `args` conflicting with required flags
 - [x] 10.8 skills: clone failure, missing `ref`, ref not found, missing `subpath`, symlink escape, `allowed_skill_sources` glob semantics, git unavailable
 - [x] 10.9 orchestration: dedupe findings merged across chunks; clamp/drop invalid finding fields; sanitize scope/review names in artifact filenames; disk-write failure
-- [ ] 10.10 publish: token without write permission (fork PR), Check Run needs GitHub App token (local PAT) → degrade to PR-review-only + warn, rate limit / 5xx with backoff, stale head SHA, comment-count limits, idempotent re-run
+- [x] 10.10 publish: token without write permission (fork PR), Check Run needs GitHub App token (local PAT) → degrade to PR-review-only + warn, rate limit / 5xx with backoff, stale head SHA, comment-count limits, idempotent re-run
 - [x] 10.11 render: missing/corrupt run record; dangling `latest`; zero findings emits valid output
 
 ## 11. Validation
