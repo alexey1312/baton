@@ -7,7 +7,7 @@
 - [x] 1.3 Add `mise.toml` (swift 6.3, swiftlint, swiftformat, xcsift, gh, git-cliff) and tasks (build/test/lint/format)
 - [x] 1.4 Port ExFig scaffolding: `TerminalUI/` (Noora wrapper, `TTYDetector`, output coordination), logger bootstrap
 - [x] 1.5 Port error model: `LocalizedError` + `recoverySuggestion` + formatter
-- [ ] 1.6 CI workflows: build-macos, build-linux (swift:6.3), build-windows (best-effort), lint
+- [x] 1.6 CI workflows: build-macos, build-linux (swift:6.3), build-windows (best-effort), lint
 - [x] 1.7 Windows spike: verify `mattt/swift-toml` builds; record fallback to `LebJe/TOMLKit` if needed
 
 ## 2. config-cascade
@@ -109,12 +109,12 @@
 - [ ] 12.1 `mise.toml`: pin tools (swift 6.3, swiftlint, swiftformat, dprint, hk, actionlint, git-cliff, xcsift) + tasks (`build`/`test`/`lint`/`format`/`format-check`/`docs`/`changelog`); commit `mise.lock`
 - [x] 12.2 `hk.pkl` + `.githooks/`: `pre-commit` (swiftformat, swiftlint --strict, dprint, actionlint; auto-fix + restage) and `commit-msg` (conventional commits); delegate via `mise x -- hk run`; honor `HK=0`; align hk pin between `mise.toml` and `hk.pkl`
 - [ ] 12.3 Linter/formatter configs: `.swiftlint.yml`, `.swiftformat`, `dprint.json` (drop ExFig PKL/llms-specific bits)
-- [ ] 12.4 CI `ci.yml`: triggers push `main` + PR, concurrency-cancel; `lint` job (`format-check` + `lint` + `actionlint`) → `build-macos` + `build-linux` (swift:6.3, xcsift, `.build` cache) + `build-windows` (best-effort)
+- [x] 12.4 CI `ci.yml`: triggers push `main` + PR, concurrency-cancel; `lint` job (`format-check` + `lint` + `actionlint`) → `build-macos` + `build-linux` (swift:6.3, xcsift, `.build` cache) + `build-windows` (best-effort)
 - [x] 12.5 DocC: `Baton.docc` catalog on the executable target; `swift-docc-plugin` (`#if !os(Windows)`); `docs` task generates static-hosting site (base path `baton`) + redirect `index.html`
-- [ ] 12.6 `deploy-docc.yml`: build + deploy DocC to GitHub Pages on `v*` tags + manual dispatch (`pages: write`, `id-token: write`)
-- [ ] 12.7 `release.yml`: on `v*` tags build macOS universal (`lipo` arm64+x86_64) + Linux (static stdlib) + Windows (best-effort); set version into the command source; `git-cliff` notes; `softprops/action-gh-release` with archives; prerelease when tag has `-`
+- [x] 12.6 `deploy-docc.yml`: build + deploy DocC to GitHub Pages on `v*` tags + manual dispatch (`pages: write`, `id-token: write`)
+- [x] 12.7 `release.yml`: on `v*` tags build macOS universal (`lipo` arm64+x86_64) + Linux (static stdlib) + Windows (best-effort); set version into the command source; `git-cliff` notes; `softprops/action-gh-release` with archives; prerelease when tag has `-`
 - [x] 12.8 `cliff.toml`: conventional-commit groups; remote `owner/repo` = your repo
-- [ ] 12.9 `update-version` job: regenerate `CHANGELOG.md` + commit to `main` (non-prerelease only)
-- [ ] 12.10 `update-homebrew` job: compute SHA256 of macOS/Linux archives, bump `Formula/baton.rb` in `alexey1312/homebrew-tap` (secret `HOMEBREW_TAP_TOKEN`); non-prerelease only
-- [ ] 12.11 README install docs: `mise use -g github:alexey1312/swift-baton` and `brew install alexey1312/tap/baton`
-- [ ] 12.12 No code signing/notarization in MVP (document as future, as in ExFig)
+- [x] 12.9 `update-version` job: regenerate `CHANGELOG.md` + commit to `main` (non-prerelease only)
+- [x] 12.10 `update-homebrew` job: compute SHA256 of macOS/Linux archives, bump `Formula/baton.rb` in `alexey1312/homebrew-tap` (secret `HOMEBREW_TAP_TOKEN`); non-prerelease only
+- [x] 12.11 README install docs: `mise use -g github:alexey1312/swift-baton` and `brew install alexey1312/tap/baton`
+- [x] 12.12 No code signing/notarization in MVP (document as future, as in ExFig)

@@ -1,0 +1,277 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: write
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Derive the release version and prerelease flag once, share via outputs.
+  # VERSION is the tag with the leading "v" (e.g. v1.2.3). A "-" in the tag
+  # marks a prerelease (e.g. v1.2.3-beta.1).
+  # ---------------------------------------------------------------------------
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+    steps:
+      - name: Compute version metadata
+        id: meta
+        run: |
+          VERSION="$GITHUB_REF_NAME"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: macos
+            # Suffix appended after "baton-${VERSION}-" to form the asset name.
+            asset-suffix: macos
+            artifact-name: baton-macos
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            asset-suffix: linux-x86_64
+            artifact-name: baton-linux-x86_64
+            container: swift:6.3
+          - os: windows-latest
+            platform: windows-x86_64
+            asset-suffix: windows-x86_64
+            artifact-name: baton-windows-x86_64
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    continue-on-error: ${{ matrix.platform == 'windows-x86_64' }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+
+    steps:
+      - name: Install dependencies (Linux)
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          apt-get update
+          apt-get install -y curl git
+
+      - uses: actions/checkout@v4
+
+      - name: Install Swift (Windows)
+        if: matrix.platform == 'windows-x86_64'
+        uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-6.3-release
+          tag: 6.3-RELEASE
+
+      - name: Show Swift version
+        run: swift --version
+
+      # Inject the tag version into the embedded version constant before building.
+      - name: Set version from tag (Unix)
+        if: matrix.platform != 'windows-x86_64'
+        run: |
+          FILE="Sources/BatonCLI/Baton.swift"
+          if [ "${{ matrix.platform }}" = "macos" ]; then
+            sed -i '' "s/static let version = \".*\"/static let version = \"$VERSION\"/" "$FILE"
+          else
+            sed -i "s/static let version = \".*\"/static let version = \"$VERSION\"/" "$FILE"
+          fi
+
+      - name: Set version from tag (Windows)
+        if: matrix.platform == 'windows-x86_64'
+        shell: pwsh
+        run: |
+          $file = "Sources/BatonCLI/Baton.swift"
+          (Get-Content $file) -replace 'static let version = ".*"', "static let version = `"$env:VERSION`"" | Set-Content $file
+
+      # macOS: universal binary (arm64 + x86_64) via the multi-arch build.
+      - name: Build release binary (macOS)
+        if: matrix.platform == 'macos'
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Create release archive (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          tar czvf "baton-${VERSION}-${{ matrix.asset-suffix }}.tar.gz" -C .build/apple/Products/Release baton
+
+      # Linux: statically link the Swift stdlib so the binary runs without a toolchain.
+      - name: Build release binary (Linux)
+        if: matrix.platform == 'linux-x86_64'
+        run: swift build -c release -Xswiftc -static-stdlib
+
+      - name: Create release archive (Linux)
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          tar czvf "baton-${VERSION}-${{ matrix.asset-suffix }}.tar.gz" -C .build/x86_64-unknown-linux-gnu/release baton
+
+      # Windows: best-effort build + zip.
+      - name: Build release binary (Windows)
+        if: matrix.platform == 'windows-x86_64'
+        run: swift build -c release
+
+      - name: Create release archive (Windows)
+        if: matrix.platform == 'windows-x86_64'
+        shell: pwsh
+        run: |
+          $bin = ".build/x86_64-unknown-windows-msvc/release/baton.exe"
+          Compress-Archive -Path $bin -DestinationPath "baton-$env:VERSION-${{ matrix.asset-suffix }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            baton-${{ env.VERSION }}-${{ matrix.asset-suffix }}.tar.gz
+            baton-${{ env.VERSION }}-${{ matrix.asset-suffix }}.zip
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Aggregate artifacts, generate notes with git-cliff, publish the release.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Create Release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      IS_PRERELEASE: ${{ needs.version.outputs.is_prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate release notes
+        run: mise x -- git-cliff --latest --strip header --output RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
+          files: |
+            artifacts/baton-macos/baton-*-macos.tar.gz
+            artifacts/baton-linux-x86_64/baton-*-linux-x86_64.tar.gz
+            artifacts/baton-windows-x86_64/baton-*-windows-x86_64.zip
+
+  # ---------------------------------------------------------------------------
+  # Stable releases only: regenerate CHANGELOG.md and commit it to main.
+  # ---------------------------------------------------------------------------
+  update-version:
+    name: Update CHANGELOG on main
+    needs: [version, publish]
+    if: ${{ needs.version.outputs.is_prerelease == 'false' }}
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: jdx/mise-action@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Regenerate CHANGELOG.md
+        run: mise run changelog
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "chore(release): update CHANGELOG.md"
+          git push origin main
+
+  # ---------------------------------------------------------------------------
+  # Stable releases only: bump the Homebrew formula in alexey1312/homebrew-tap.
+  # ---------------------------------------------------------------------------
+  update-homebrew:
+    name: Update Homebrew Tap
+    needs: [version, publish]
+    if: ${{ needs.version.outputs.is_prerelease == 'false' }}
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Download release archives and compute SHA256
+        id: sha
+        run: |
+          # VERSION includes the leading "v"; the release assets are tagged with it.
+          REPO="alexey1312/swift-baton"
+          BASE="https://github.com/${REPO}/releases/download/${VERSION}"
+
+          curl -fsSL "${BASE}/baton-${VERSION}-macos.tar.gz" -o baton-macos.tar.gz
+          MACOS_SHA=$(sha256sum baton-macos.tar.gz | cut -d' ' -f1)
+          echo "macos=${MACOS_SHA}" >> "$GITHUB_OUTPUT"
+
+          curl -fsSL "${BASE}/baton-${VERSION}-linux-x86_64.tar.gz" -o baton-linux.tar.gz
+          LINUX_SHA=$(sha256sum baton-linux.tar.gz | cut -d' ' -f1)
+          echo "linux=${LINUX_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: alexey1312/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        env:
+          MACOS_SHA: ${{ steps.sha.outputs.macos }}
+          LINUX_SHA: ${{ steps.sha.outputs.linux }}
+        run: |
+          # Version without the leading "v" for the formula's `version` field.
+          PLAIN_VERSION="${VERSION#v}"
+          FORMULA="homebrew-tap/Formula/baton.rb"
+
+          # TODO(homebrew): Confirm Formula/baton.rb exists in alexey1312/homebrew-tap
+          # with a `version "..."` line and two `url`/`sha256` blocks ordered
+          # macOS-first then Linux. Adjust the sed selectors below if the layout
+          # differs (e.g. `on_macos`/`on_linux` blocks instead of bare order).
+          sed -i "s|version \".*\"|version \"${PLAIN_VERSION}\"|" "$FORMULA"
+          # First sha256 -> macOS archive.
+          sed -i "0,/sha256 \"[a-f0-9]*\"/s//sha256 \"${MACOS_SHA}\"/" "$FORMULA"
+          # Second sha256 (after the macOS one) -> Linux archive.
+          sed -i "0,/sha256 \"${MACOS_SHA}\"/! {0,/sha256 \"[a-f0-9]*\"/s//sha256 \"${LINUX_SHA}\"/}" "$FORMULA"
+
+          cat "$FORMULA"
+
+      - name: Commit and push tap
+        working-directory: homebrew-tap
+        env:
+          PLAIN_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/baton.rb
+          git diff --staged --quiet || git commit -m "chore: bump baton to ${PLAIN_VERSION#v}"
+          git push
