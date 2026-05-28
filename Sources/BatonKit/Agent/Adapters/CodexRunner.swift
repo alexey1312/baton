@@ -5,4 +5,10 @@ public struct CodexRunner: AgentRunner {
     public let baseArguments = ["exec", "--skip-git-repo-check"]
 
     public init() {}
+
+    public func parse(_ output: AgentOutput) throws -> ParsedFindings {
+        var parsed = try FindingsParser.parse(output.stdout)
+        parsed.usage = UsageExtractor.extract(stdout: output.stdout, model: nil)
+        return parsed
+    }
 }

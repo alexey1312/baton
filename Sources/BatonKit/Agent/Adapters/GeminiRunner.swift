@@ -5,4 +5,10 @@ public struct GeminiRunner: AgentRunner {
     public let baseArguments = ["--approval-mode=yolo", "--skip-trust"]
 
     public init() {}
+
+    public func parse(_ output: AgentOutput) throws -> ParsedFindings {
+        var parsed = try FindingsParser.parse(output.stdout)
+        parsed.usage = UsageExtractor.extract(stdout: output.stdout, model: nil)
+        return parsed
+    }
 }
