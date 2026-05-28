@@ -12,6 +12,7 @@ var packageDependencies: [Package.Dependency] = [
     .package(url: "https://github.com/mattt/swift-toml", from: "2.0.0"),
     .package(url: "https://github.com/mattt/swift-yyjson", from: "0.5.0"),
     .package(url: "https://github.com/huggingface/swift-jinja.git", from: "2.0.0"),
+    .package(url: "https://github.com/stephencelis/SQLite.swift", from: "0.15.0"),
 ]
 
 // swift-docc-plugin uses snippet APIs unavailable on Windows.
@@ -41,6 +42,7 @@ let package = Package(
                 .product(name: "TOML", package: "swift-toml"),
                 .product(name: "YYJSON", package: "swift-yyjson"),
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "SQLite", package: "SQLite.swift"),
             ]
         ),
 
