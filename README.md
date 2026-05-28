@@ -95,4 +95,4 @@ are archived under `openspec/changes/archive/`.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE)
