@@ -1,0 +1,17 @@
+[agent]
+kind = "claude"
+model = "haiku"
+
+[[skills]]
+name = "swift-style"
+source = "./.claude/skills/swift"
+
+[[reviews]]
+name = "swift-style"
+skills = ["swift-style"]
+glob = ["**/*.swift"]
+prompt = """
+Review the diff for violations of the Airbnb Swift style guide attached as the reference skill.
+Report concrete style violations as findings; flag only issues actually covered by the guide.
+Focus on the changed lines (the `+` lines in the diff).
+"""
