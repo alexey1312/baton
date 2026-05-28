@@ -10,7 +10,8 @@ struct MigrationsTests {
         #expect(try Migrations.currentVersion(db) == 0)
 
         // meta table now exists
-        let row = try db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='meta'").makeIterator().next()
+        let sql = "SELECT name FROM sqlite_master WHERE type='table' AND name='meta'"
+        let row = try db.prepare(sql).makeIterator().next()
         #expect(row != nil)
     }
 
