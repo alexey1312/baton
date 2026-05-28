@@ -6,10 +6,22 @@ model = "haiku"
 name = "swift-style"
 source = "./.claude/skills/swift"
 
+[[skills]]
+name = "swift-concurrency"
+source = "./.claude/skills/swift-concurrency"
+
 [[reviews]]
 name = "swift-style"
 skills = ["swift-style"]
 glob = ["**/*.swift"]
 prompt = """
 Review the added (`+`) lines in the diff against the attached Swift style guide. Emit a finding for each rule the code violates, citing the rule. Return {"findings": []} if nothing violates.
+"""
+
+[[reviews]]
+name = "swift-concurrency"
+skills = ["swift-concurrency"]
+glob = ["**/*.swift"]
+prompt = """
+Review the added (`+`) lines in the diff for Swift Concurrency correctness, using the attached Swift Concurrency skill as your reference. Flag data races, unsafe `@unchecked Sendable` / `nonisolated(unsafe)` / `@preconcurrency` use without a stated invariant, unjustified blanket `@MainActor`, blocking work on an actor or the main actor, and incorrect `async`/`await`, `Task`, or actor-isolation usage. Cite the specific concern. Return {"findings": []} if nothing is wrong.
 """
