@@ -20,9 +20,9 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -37,17 +37,17 @@ jobs:
     runs-on: macos-14
     needs: lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache SPM dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .build
           key: ${{ runner.os }}-swift-6.3-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-swift-6.3-spm-
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -72,17 +72,17 @@ jobs:
           apt-get update
           apt-get install -y curl git
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache SPM dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .build
           key: ${{ runner.os }}-swift-6.3-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-swift-6.3-spm-
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -101,16 +101,16 @@ jobs:
     needs: lint
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Swift
-        uses: compnerd/gha-setup-swift@main
+        uses: compnerd/gha-setup-swift@v0.4.0
         with:
-          branch: swift-6.3-release
-          tag: 6.3-RELEASE
+          swift-version: swift-6.3-release
+          swift-build: 6.3-RELEASE
 
       - name: Cache SPM dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .build
           key: ${{ runner.os }}-swift-6.3-spm-${{ hashFiles('Package.resolved') }}

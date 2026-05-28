@@ -71,14 +71,14 @@ jobs:
           apt-get update
           apt-get install -y curl git
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Swift (Windows)
         if: matrix.platform == 'windows-x86_64'
-        uses: compnerd/gha-setup-swift@main
+        uses: compnerd/gha-setup-swift@v0.4.0
         with:
-          branch: swift-6.3-release
-          tag: 6.3-RELEASE
+          swift-version: swift-6.3-release
+          swift-build: 6.3-RELEASE
 
       - name: Show Swift version
         run: swift --version
@@ -134,7 +134,7 @@ jobs:
           Compress-Archive -Path $bin -DestinationPath "baton-$env:VERSION-${{ matrix.asset-suffix }}.zip"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact-name }}
           path: |
@@ -153,16 +153,16 @@ jobs:
       VERSION: ${{ needs.version.outputs.version }}
       IS_PRERELEASE: ${{ needs.version.outputs.is_prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -170,7 +170,7 @@ jobs:
         run: mise x -- git-cliff --latest --strip header --output RELEASE_NOTES.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: RELEASE_NOTES.md
           prerelease: ${{ env.IS_PRERELEASE == 'true' }}
@@ -190,13 +190,13 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -238,7 +238,7 @@ jobs:
           echo "linux=${LINUX_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout Homebrew tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: alexey1312/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
