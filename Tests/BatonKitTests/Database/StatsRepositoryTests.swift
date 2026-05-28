@@ -60,6 +60,43 @@ struct StatsRepositoryTests {
         #expect(top.first?.file == "auth.swift")
     }
 
+    @Test("summary narrows by review without throwing")
+    func summaryByReview() throws {
+        let database = try BatonDatabase.openInMemory()
+        try seedThreeRuns(database.connection)
+        let stats = StatsRepository(connection: database.connection)
+
+        let summary = try stats.summary(filter: StatsFilter(review: "security"))
+        #expect(summary.totalRuns == 2)
+        #expect(summary.totalFindings == 2)
+        #expect(summary.totalCostUSD.map { abs($0 - 0.03) < 0.0001 } == true)
+    }
+
+    @Test("summary narrows by scope without throwing")
+    func summaryByScope() throws {
+        let database = try BatonDatabase.openInMemory()
+        try seedThreeRuns(database.connection)
+        let stats = StatsRepository(connection: database.connection)
+
+        let summary = try stats.summary(filter: StatsFilter(scope: ""))
+        #expect(summary.totalRuns == 3)
+    }
+
+    @Test("summary combines repoId, since, and review filters")
+    func summaryCombinedFilters() throws {
+        let database = try BatonDatabase.openInMemory()
+        try seedThreeRuns(database.connection)
+        let stats = StatsRepository(connection: database.connection)
+
+        let filter = StatsFilter(
+            repoId: "repo-A",
+            review: "security",
+            since: Date(timeIntervalSince1970: 0)
+        )
+        let summary = try stats.summary(filter: filter)
+        #expect(summary.totalRuns == 2)
+    }
+
     // MARK: - Fixtures
 
     private func seedThreeRuns(_ db: Connection) throws {

@@ -66,18 +66,34 @@ public final class StatsRepository: @unchecked Sendable {
     }
 
     public func summary(filter: StatsFilter) throws -> StatsSummary {
-        let (clause, args) = whereClause(filter)
-        let sql = """
-        SELECT COUNT(*),
-               COALESCE(SUM(total_tasks), 0),
-               COALESCE(SUM(total_findings), 0),
-               SUM(total_cost_usd),
-               SUM(total_input_tokens),
-               SUM(total_output_tokens),
-               MIN(created_at)
-        FROM runs
-        \(clause)
-        """
+        let needsTasksJoin = filter.review != nil || filter.scope != nil
+        let (clause, args) = whereClause(filter, runsAlias: "r", joinsTasks: needsTasksJoin)
+        let sql = if needsTasksJoin {
+            """
+            SELECT COUNT(DISTINCT r.run_id),
+                   COUNT(t.task_id),
+                   COALESCE(SUM(t.finding_count), 0),
+                   SUM(t.cost_usd),
+                   SUM(t.input_tokens),
+                   SUM(t.output_tokens),
+                   MIN(r.created_at)
+            FROM runs r
+            JOIN tasks t ON t.run_id = r.run_id
+            \(clause)
+            """
+        } else {
+            """
+            SELECT COUNT(*),
+                   COALESCE(SUM(total_tasks), 0),
+                   COALESCE(SUM(total_findings), 0),
+                   SUM(total_cost_usd),
+                   SUM(total_input_tokens),
+                   SUM(total_output_tokens),
+                   MIN(created_at)
+            FROM runs r
+            \(clause)
+            """
+        }
         let row = try connectionScalarRow(connection, sql, args)
         let earliest = (row[6] as? Double).map { Date(timeIntervalSince1970: $0) }
         return StatsSummary(
@@ -183,9 +199,15 @@ public final class StatsRepository: @unchecked Sendable {
 
     // MARK: - WHERE clause builder
 
-    /// Build a parametrised WHERE clause from the filter. `runsAlias` is the
-    /// alias for the runs table when joining (default `runs`).
-    private func whereClause(_ filter: StatsFilter, runsAlias: String = "runs") -> (String, [Binding?]) {
+    /// Build a parametrised WHERE clause from the filter. `runsAlias` is the alias
+    /// for the runs table; set `joinsTasks` when the caller's FROM clause includes
+    /// a `tasks t` join so review/scope predicates can reference `t.review` /
+    /// `t.scope` safely.
+    private func whereClause(
+        _ filter: StatsFilter,
+        runsAlias: String = "runs",
+        joinsTasks: Bool = true
+    ) -> (String, [Binding?]) {
         var conditions: [String] = []
         var args: [Binding?] = []
         if let repoId = filter.repoId {
@@ -196,11 +218,11 @@ public final class StatsRepository: @unchecked Sendable {
             conditions.append("\(runsAlias).created_at >= ?")
             args.append(since.timeIntervalSince1970)
         }
-        if let review = filter.review {
+        if joinsTasks, let review = filter.review {
             conditions.append("t.review = ?")
             args.append(review)
         }
-        if let scope = filter.scope {
+        if joinsTasks, let scope = filter.scope {
             conditions.append("t.scope = ?")
             args.append(scope)
         }
