@@ -21,6 +21,15 @@ public enum SkillError: BatonError {
     case missingRequiredRef(name: String, source: String)
     /// A remote `source` does not match any pattern in `allowed_skill_sources`.
     case sourceNotAllowed(name: String, source: String, allowlist: [String])
+    /// The resolved skill directory could not be enumerated (race, permission denial,
+    /// directory replaced after `SKILL.md` lookup succeeded).
+    case skillDirectoryUnreadable(name: String, path: String)
+    /// A supporting reference file under the skill directory could not be read
+    /// (encoding, permissions, mid-walk I/O failure). Carries the original error.
+    case referenceReadFailed(name: String, path: String, underlying: String)
+    /// The cumulative size of inlined reference files exceeds the per-skill budget.
+    /// Authors should narrow the skill source via `subpath` or split the bundle.
+    case referencesBudgetExceeded(name: String, limitBytes: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -35,11 +44,18 @@ public enum SkillError: BatonError {
         case let .subpathMissing(name, source, expectedPath):
             "Skill '\(name)' (\(source)) has no directory at \(expectedPath)"
         case let .symlinkEscape(name, path):
-            "Skill '\(name)' resolves via a symlink to \(path), which is outside its skill directory"
+            "Skill '\(name)' resolves via a symlink to \(path), which is outside its skill directory" +
+                " or has no existing target"
         case let .missingRequiredRef(name, source):
             "Remote skill '\(name)' (\(source)) is missing a pinned commit ref"
         case let .sourceNotAllowed(name, source, _):
             "Remote skill '\(name)' source '\(source)' is not in allowed_skill_sources"
+        case let .skillDirectoryUnreadable(name, path):
+            "Skill '\(name)' directory at \(path) could not be enumerated"
+        case let .referenceReadFailed(name, path, underlying):
+            "Skill '\(name)' reference file \(path) could not be read: \(underlying)"
+        case let .referencesBudgetExceeded(name, limitBytes):
+            "Skill '\(name)' inlined references exceed the \(limitBytes)-byte budget"
         }
     }
 
@@ -61,6 +77,12 @@ public enum SkillError: BatonError {
             "Pin the skill to a commit SHA via `ref`, or pass --allow-unpinned."
         case let .sourceNotAllowed(_, _, allowlist):
             "Add the source to allowed_skill_sources (currently: \(allowlist.joined(separator: ", ")))."
+        case .skillDirectoryUnreadable:
+            "Ensure the skill directory exists and is readable; rerun once the underlying issue is resolved."
+        case .referenceReadFailed:
+            "Ensure the file exists, is UTF-8 encoded, and is readable by the current user."
+        case .referencesBudgetExceeded:
+            "Narrow the skill source with `subpath`, drop unused references, or split the bundle."
         }
     }
 }

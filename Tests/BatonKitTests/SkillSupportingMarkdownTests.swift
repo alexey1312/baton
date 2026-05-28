@@ -243,7 +243,6 @@ struct SkillSupportingMarkdownTests {
             #expect(resolved.body.contains("readme-body"))
             #expect(resolved.body.contains("## Reference: references/a"))
             #expect(resolved.body.contains("ref-a"))
-            // Body file itself must not be double-inlined as a reference.
             #expect(!resolved.body.contains("## Reference: README"))
         }
     }
@@ -266,9 +265,202 @@ struct SkillSupportingMarkdownTests {
             )
 
             #expect(!resolved.body.contains("## Reference: SKILL"))
-            // "main" appears exactly once: as the body. Never as a reference body.
             let occurrences = resolved.body.components(separatedBy: "main").count - 1
             #expect(occurrences == 1)
+        }
+    }
+}
+
+// MARK: - Edge cases (extension-author surprises and budget)
+
+struct SkillSupportingMarkdownEdgeCaseTests {
+    @Test("same basename in different sub-paths is preserved separately")
+    func sameBasenameDifferentPath() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            try SkillTestFixtures.writeFile(
+                dir.appendingPathComponent("a", isDirectory: true),
+                "x.md",
+                "A/x body"
+            )
+            try SkillTestFixtures.writeFile(
+                dir.appendingPathComponent("b", isDirectory: true),
+                "x.md",
+                "B/x body"
+            )
+
+            let resolved = try localResolver(root).resolve(
+                SkillConfig(name: "x", source: "./skills/x"),
+                declaringConfigDir: root,
+                security: nil
+            )
+
+            #expect(resolved.body.contains("## Reference: a/x"))
+            #expect(resolved.body.contains("## Reference: b/x"))
+            #expect(resolved.body.contains("A/x body"))
+            #expect(resolved.body.contains("B/x body"))
+            let aLabel = try #require(resolved.body.range(of: "## Reference: a/x"))
+            let bLabel = try #require(resolved.body.range(of: "## Reference: b/x"))
+            #expect(aLabel.lowerBound < bLabel.lowerBound)
+        }
+    }
+
+    @Test("references nested three levels deep are inlined with full relative path")
+    func deeplyNestedReferences() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            let deep = dir
+                .appendingPathComponent("docs", isDirectory: true)
+                .appendingPathComponent("guides", isDirectory: true)
+                .appendingPathComponent("advanced", isDirectory: true)
+            try SkillTestFixtures.writeFile(deep, "topic.md", "deep-body")
+
+            let resolved = try localResolver(root).resolve(
+                SkillConfig(name: "x", source: "./skills/x"),
+                declaringConfigDir: root,
+                security: nil
+            )
+
+            #expect(resolved.body.contains("## Reference: docs/guides/advanced/topic"))
+            #expect(resolved.body.contains("deep-body"))
+        }
+    }
+
+    @Test("uppercase .MD extension is inlined and stripped from the label")
+    func uppercaseMdExtension() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            try SkillTestFixtures.writeFile(
+                dir.appendingPathComponent("references", isDirectory: true),
+                "Notes.MD",
+                "shouty"
+            )
+
+            let resolved = try localResolver(root).resolve(
+                SkillConfig(name: "x", source: "./skills/x"),
+                declaringConfigDir: root,
+                security: nil
+            )
+
+            #expect(resolved.body.contains("## Reference: references/Notes"))
+            #expect(!resolved.body.contains("references/Notes.MD"))
+            #expect(resolved.body.contains("shouty"))
+        }
+    }
+
+    @Test("non-UTF-8 reference file surfaces referenceReadFailed")
+    func nonUTF8ReferenceFails() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            let refs = dir.appendingPathComponent("references", isDirectory: true)
+            try FileManager.default.createDirectory(at: refs, withIntermediateDirectories: true)
+            let bad = refs.appendingPathComponent("broken.md")
+            try Data([0xFF, 0xFE, 0xFD, 0x00, 0xC3, 0x28]).write(to: bad)
+
+            do {
+                _ = try localResolver(root).resolve(
+                    SkillConfig(name: "x", source: "./skills/x"),
+                    declaringConfigDir: root,
+                    security: nil
+                )
+                Issue.record("expected referenceReadFailed")
+            } catch let error as SkillError {
+                guard case let .referenceReadFailed(_, path, _) = error else {
+                    Issue.record("wrong error: \(error)")
+                    return
+                }
+                #expect(path.hasSuffix("broken.md"))
+            }
+        }
+    }
+
+    @Test("hidden directories like .vscode/.idea are skipped")
+    func hiddenDirectoriesSkipped() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            try SkillTestFixtures.writeFile(
+                dir.appendingPathComponent(".vscode", isDirectory: true),
+                "notes.md",
+                "vscode-notes"
+            )
+            try SkillTestFixtures.writeFile(
+                dir.appendingPathComponent(".idea", isDirectory: true),
+                "scratch.md",
+                "idea-scratch"
+            )
+            try SkillTestFixtures.writeFile(dir, ".hidden.md", "dotfile")
+
+            let resolved = try localResolver(root).resolve(
+                SkillConfig(name: "x", source: "./skills/x"),
+                declaringConfigDir: root,
+                security: nil
+            )
+
+            #expect(resolved.body == "main")
+            #expect(!resolved.body.contains("vscode-notes"))
+            #expect(!resolved.body.contains("idea-scratch"))
+            #expect(!resolved.body.contains("dotfile"))
+        }
+    }
+
+    @Test("dangling symlink inside the skill directory is rejected")
+    func danglingSymlinkRejected() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            let refs = dir.appendingPathComponent("references", isDirectory: true)
+            try FileManager.default.createDirectory(at: refs, withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(
+                at: refs.appendingPathComponent("dangling.md"),
+                withDestinationURL: refs.appendingPathComponent("does-not-exist.md")
+            )
+
+            do {
+                _ = try localResolver(root).resolve(
+                    SkillConfig(name: "x", source: "./skills/x"),
+                    declaringConfigDir: root,
+                    security: nil
+                )
+                Issue.record("expected symlinkEscape for dangling target")
+            } catch let error as SkillError {
+                guard case .symlinkEscape = error else {
+                    Issue.record("wrong error: \(error)")
+                    return
+                }
+            }
+        }
+    }
+
+    @Test("cumulative references exceeding the byte budget are rejected")
+    func referencesBudgetExceeded() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let dir = root.appendingPathComponent("skills/x", isDirectory: true)
+            try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
+            let refs = dir.appendingPathComponent("references", isDirectory: true)
+            // Two ~200 KB files sum to ~400 KB > 256 KB cap.
+            let chunk = String(repeating: "x", count: 200 * 1024)
+            try SkillTestFixtures.writeFile(refs, "a.md", chunk)
+            try SkillTestFixtures.writeFile(refs, "b.md", chunk)
+
+            do {
+                _ = try localResolver(root).resolve(
+                    SkillConfig(name: "x", source: "./skills/x"),
+                    declaringConfigDir: root,
+                    security: nil
+                )
+                Issue.record("expected referencesBudgetExceeded")
+            } catch let error as SkillError {
+                guard case let .referencesBudgetExceeded(_, limitBytes) = error else {
+                    Issue.record("wrong error: \(error)")
+                    return
+                }
+                #expect(limitBytes == 256 * 1024)
+            }
         }
     }
 
@@ -277,7 +469,6 @@ struct SkillSupportingMarkdownTests {
         try SkillTestFixtures.withTempDir { root in
             let dir = root.appendingPathComponent("skills/x", isDirectory: true)
             try SkillTestFixtures.writeFile(dir, "SKILL.md", "main")
-            // None of these should be inlined.
             try SkillTestFixtures.writeFile(
                 dir.appendingPathComponent(".git", isDirectory: true),
                 "config.md",

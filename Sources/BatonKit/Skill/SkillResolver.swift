@@ -107,8 +107,8 @@ public struct SkillResolver: Sendable {
         guard let bodyURL = bodyFileURL(in: dir, fileManager: fileManager) else {
             throw SkillError.missingSkillFile(name: skill.name, searchedPath: dir.path)
         }
-        // Local skills used to skip the symlink-escape check; running it here closes
-        // that gap and shares the trust boundary with the new references-inlining walk.
+        // The symlink-escape check is the single trust boundary for every file the
+        // resolver reads (body + inlined references), local or remote.
         try assertNoSymlinkEscape(bodyURL, within: dir, skillName: skill.name)
         let body = try readBody(bodyURL, skillName: skill.name)
         let augmented = try inlineSupportingMarkdown(
@@ -352,10 +352,17 @@ public struct SkillResolver: Sendable {
         }
     }
 
-    /// Reject a body file that resolves, through symlinks, to a path outside `base`.
+    /// Reject `url` when its symlink-resolved canonical path falls outside `base`,
+    /// when the path is dangling (resolved target does not exist), or when any
+    /// intermediate component cannot be canonicalised. `resolvingSymlinksInPath()`
+    /// can return the input unchanged for a dangling target, so the existence
+    /// check is required to close that gap.
     func assertNoSymlinkEscape(_ url: URL, within base: URL, skillName: String) throws {
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
         let resolvedBase = base.resolvingSymlinksInPath().standardizedFileURL
+        if !FileManager.default.fileExists(atPath: resolved.path) {
+            throw SkillError.symlinkEscape(name: skillName, path: resolved.path)
+        }
         var basePath = resolvedBase.path
         if !basePath.hasSuffix("/") {
             basePath += "/"

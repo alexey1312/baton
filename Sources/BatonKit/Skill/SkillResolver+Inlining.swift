@@ -1,8 +1,13 @@
 import Foundation
 
 extension SkillResolver {
-    /// Return the body file URL (`SKILL.md` preferred, then `README.md`) in `dir`,
-    /// or `nil` when neither exists.
+    /// Cumulative byte budget for inlined supporting markdown per skill. Baton sends the
+    /// resolved body to a headless agent (`claude --print`, codex/gemini/opencode); an
+    /// unbounded walk could silently fill the context window or OOM the agent. The
+    /// budget is unconditional — narrow the skill via `subpath` or split the bundle.
+    static let referencesBudgetBytes: Int = 256 * 1024
+
+    /// `SKILL.md` first, then `README.md`. `nil` when neither exists.
     func bodyFileURL(in dir: URL, fileManager: FileManager) -> URL? {
         for candidate in ["SKILL.md", "README.md"] {
             let url = dir.appendingPathComponent(candidate)
@@ -13,22 +18,21 @@ extension SkillResolver {
         return nil
     }
 
-    /// Whether `url` is a directory on disk.
     func isDirectory(_ url: URL, fileManager: FileManager) -> Bool {
         var isDir: ObjCBool = false
         return fileManager.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
     }
 
-    /// Append every supporting `*.md` found under `skillDir` (other than the chosen
-    /// body file) to `body`, alphabetically by relative path, under a
-    /// `## Reference: <relative-path-without-extension>` header.
+    /// Inline every supporting `*.md` under `skillDir` (excluding `bodyURL`) into `body`,
+    /// alphabetically by relative path, under `## Reference: <path-without-extension>`
+    /// headers.
     ///
     /// Baton's agent runs headless — no Read tool, no on-the-fly file access — so any
     /// supporting file not inlined here is invisible to the model. The walk is
-    /// recursive across the three live skill conventions (Codex `references/`,
-    /// Claude-style root-level `reference.md` or `examples/sample.md`) and skips
-    /// `.git/`, `.build/`, `node_modules/` as a paranoia guard against a
-    /// misconfigured skill source pointing at a project root.
+    /// recursive across known skill conventions (Codex `references/`, Claude-style
+    /// root-level `reference.md` or `examples/sample.md`) and skips hidden directories
+    /// and `node_modules/` as a paranoia guard against a misconfigured skill source
+    /// pointing at a project root.
     func inlineSupportingMarkdown(
         body: String,
         bodyURL: URL,
@@ -41,32 +45,38 @@ extension SkillResolver {
             skillName: skillName
         )
         if supporting.isEmpty { return body }
-        var combined = body
+        var chunks: [String] = [body]
+        chunks.reserveCapacity(supporting.count + 1)
         for entry in supporting {
-            combined += "\n\n## Reference: \(entry.label)\n\(entry.content)"
+            chunks.append("## Reference: \(entry.label)\n\(entry.content)")
         }
-        return combined
+        return chunks.joined(separator: "\n\n")
     }
 
     /// Walk `skillDir` for `*.md` files (excluding `bodyURL`), enforce the
-    /// symlink-escape invariant per file, and return them sorted by relative path.
+    /// symlink-escape invariant per file, hold the cumulative size under
+    /// `referencesBudgetBytes`, and return the entries sorted by relative path.
     private func collectSupportingMarkdown(
         in skillDir: URL,
         bodyURL: URL,
         skillName: String
     ) throws -> [(label: String, content: String)] {
         let fileManager = FileManager.default
-        let skipDirs = [".git", ".build", "node_modules"]
+        // `skipsHiddenFiles` already excludes any dot-prefixed entry (`.git`, `.build`,
+        // `.vscode`, ...). Only non-hidden directories that still don't belong in a
+        // skill bundle need an explicit entry here.
+        let skipDirs: Set = ["node_modules"]
         let bodyPath = bodyURL.standardizedFileURL.path
         let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey]
         guard let enumerator = fileManager.enumerator(
             at: skillDir,
             includingPropertiesForKeys: keys,
-            options: []
+            options: [.skipsHiddenFiles]
         ) else {
-            return []
+            throw SkillError.skillDirectoryUnreadable(name: skillName, path: skillDir.path)
         }
         var collected: [(label: String, content: String)] = []
+        var totalBytes = 0
         for case let url as URL in enumerator {
             let values = try url.resourceValues(forKeys: Set(keys))
             if values.isDirectory == true {
@@ -81,23 +91,50 @@ extension SkillResolver {
             let standardized = url.standardizedFileURL
             if standardized.path == bodyPath { continue }
             try assertNoSymlinkEscape(standardized, within: skillDir, skillName: skillName)
-            let content = try readBody(standardized, skillName: skillName)
+            let content = try readReference(standardized, skillName: skillName)
+            totalBytes += content.utf8.count
+            if totalBytes > Self.referencesBudgetBytes {
+                throw SkillError.referencesBudgetExceeded(
+                    name: skillName,
+                    limitBytes: Self.referencesBudgetBytes
+                )
+            }
             collected.append((relativeMarkdownLabel(of: standardized, within: skillDir), content))
         }
         collected.sort { $0.label < $1.label }
         return collected
     }
 
-    /// Compute the `## Reference:` header label: the file path relative to `base`,
-    /// with the `.md` extension stripped. Falls back to the absolute path when
-    /// `url` isn't inside `base` (defensive — the symlink-escape check should have
-    /// already rejected that case).
+    /// Read a supporting reference file, surfacing a `referenceReadFailed` error with
+    /// the original underlying message — distinct from the body-missing case so the
+    /// recovery suggestion ("ensure UTF-8 / readable") matches the actual failure mode.
+    private func readReference(_ url: URL, skillName: String) throws -> String {
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            throw SkillError.referenceReadFailed(
+                name: skillName,
+                path: url.path,
+                underlying: error.localizedDescription
+            )
+        }
+    }
+
+    /// Header label for a `## Reference:` block: path of `url` relative to `base`, with
+    /// the `.md` extension stripped. The symlink-escape check is supposed to make the
+    /// not-inside-base branch unreachable; a `preconditionFailure` here surfaces a
+    /// future regression loudly instead of leaking an absolute system path into the
+    /// prompt.
     private func relativeMarkdownLabel(of url: URL, within base: URL) -> String {
         let basePath = base.path.hasSuffix("/") ? base.path : base.path + "/"
         let fullPath = url.path
-        let relative = fullPath.hasPrefix(basePath)
-            ? String(fullPath.dropFirst(basePath.count))
-            : fullPath
+        guard fullPath.hasPrefix(basePath) else {
+            preconditionFailure(
+                "relativeMarkdownLabel called with \(fullPath) outside of base \(basePath); " +
+                    "symlink-escape check should have rejected this case"
+            )
+        }
+        let relative = String(fullPath.dropFirst(basePath.count))
         return relative.lowercased().hasSuffix(".md")
             ? String(relative.dropLast(3))
             : relative
