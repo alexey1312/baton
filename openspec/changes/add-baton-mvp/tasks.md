@@ -50,12 +50,12 @@
 
 ## 6. review-orchestration
 
-- [ ] 6.1 `PromptBuilder`: role + review instructions + isolated skills block + output-format + diff
-- [ ] 6.2 Orchestrator: one task per `(scope, review)`; sliding-window concurrency (`max_concurrency`)
-- [ ] 6.3 Response parser: plain JSON → fenced → brace-balanced (string-literal aware) → findings
-- [ ] 6.4 `RunRecord`: write `<scope>--<review>.json`, `.log`, `.prompt.md`, `manifest.json` (records `base` + review-time head SHA), `latest`
-- [ ] 6.5 Severity model (low<medium<high) and `fail_on` exit semantics
-- [ ] 6.6 Tests: prompt assembly, concurrency limit, parser robustness, run-record layout
+- [x] 6.1 `PromptBuilder`: role + review instructions + isolated skills block + output-format + diff
+- [x] 6.2 Orchestrator: one task per `(scope, review)`; sliding-window concurrency (`max_concurrency`)
+- [x] 6.3 Response parser: plain JSON → fenced → brace-balanced (string-literal aware) → findings
+- [x] 6.4 `RunRecord`: write `<scope>--<review>.json`, `.log`, `.prompt.md`, `manifest.json` (records `base` + review-time head SHA), `latest`
+- [x] 6.5 Severity model (low<medium<high) and `fail_on` exit semantics
+- [x] 6.6 Tests: prompt assembly, concurrency limit, parser robustness, run-record layout
 
 ## 7. github-publish
 
@@ -94,7 +94,7 @@
 - [x] 10.6 focus-mode: previous review SHA unreachable (force-push) → fall back to full base diff + warn
 - [x] 10.7 agent: binary missing / non-zero exit / exit-0-with-empty-stdout (auth/billing error on stderr) / unauthenticated / user `args` conflicting with required flags
 - [x] 10.8 skills: clone failure, missing `ref`, ref not found, missing `subpath`, symlink escape, `allowed_skill_sources` glob semantics, git unavailable
-- [ ] 10.9 orchestration: dedupe findings merged across chunks; clamp/drop invalid finding fields; sanitize scope/review names in artifact filenames; disk-write failure
+- [x] 10.9 orchestration: dedupe findings merged across chunks; clamp/drop invalid finding fields; sanitize scope/review names in artifact filenames; disk-write failure
 - [ ] 10.10 publish: token without write permission (fork PR), Check Run needs GitHub App token (local PAT) → degrade to PR-review-only + warn, rate limit / 5xx with backoff, stale head SHA, comment-count limits, idempotent re-run
 - [ ] 10.11 render: missing/corrupt run record; dangling `latest`; zero findings emits valid output
 
