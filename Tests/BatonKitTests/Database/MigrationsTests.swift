@@ -25,4 +25,16 @@ struct MigrationsTests {
         try Migrations.run(on: db)
         #expect(try Migrations.currentVersion(db) == 1)
     }
+
+    @Test("currentVersion throws when schema_version is not an integer")
+    func currentVersionRejectsGarbage() throws {
+        let db = try Connection(.inMemory)
+        // Create the meta table and seed a garbage value.
+        _ = try Migrations.currentVersion(db) // ensures meta exists
+        try db.run("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", "schema_version", "ten")
+
+        #expect(throws: BatonDatabaseError.self) {
+            _ = try Migrations.currentVersion(db)
+        }
+    }
 }

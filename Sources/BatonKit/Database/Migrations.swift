@@ -21,6 +21,10 @@ public enum Migrations {
     ]
 
     /// Reads the current schema version from `meta`, or `0` if no row exists.
+    /// Throws ``BatonDatabaseError.migrationFailed`` when the stored value is
+    /// present but not parseable as an `Int` — silently returning `0` in that
+    /// case would re-apply every migration over data that the schema_version
+    /// row implies has been migrated, producing data loss.
     public static func currentVersion(_ db: Connection) throws -> Int {
         try db.execute("""
         CREATE TABLE IF NOT EXISTS meta(
@@ -28,13 +32,24 @@ public enum Migrations {
             value TEXT NOT NULL
         )
         """)
-        if let row = try db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").makeIterator().next(),
-           let value = row[0] as? String,
-           let version = Int(value)
-        {
-            return version
+        guard let row = try db.prepare("SELECT value FROM meta WHERE key = 'schema_version'")
+            .makeIterator().next()
+        else {
+            return 0
         }
-        return 0
+        guard let value = row[0] as? String else {
+            throw BatonDatabaseError.migrationFailed(
+                version: -1,
+                underlying: "schema_version is not a string"
+            )
+        }
+        guard let version = Int(value) else {
+            throw BatonDatabaseError.migrationFailed(
+                version: -1,
+                underlying: "schema_version is not an integer: \(value)"
+            )
+        }
+        return version
     }
 
     /// Apply every pending migration in a single transaction per step.
