@@ -75,18 +75,18 @@
 
 ## 9. cli
 
-- [ ] 9.1 `@main baton` (AsyncParsableCommand) + global options (`--verbose`, `--quiet`)
-- [ ] 9.2 `init` — write starter `baton.toml` (`--agent`, `--model`, `--path`, `--force`)
-- [ ] 9.3 `review [name]` — `--base --agent --model --json --max-concurrency --repo --allow-unpinned`
-- [ ] 9.4 `config [--explain]` — print effective per-scope config with provenance
+- [x] 9.1 `@main baton` (AsyncParsableCommand) + global options (`--verbose`, `--quiet`)
+- [x] 9.2 `init` — write starter `baton.toml` (`--agent`, `--model`, `--path`, `--force`)
+- [x] 9.3 `review [name]` — `--base --agent --model --json --max-concurrency --repo --allow-unpinned`
+- [x] 9.4 `config [--explain]` — print effective per-scope config with provenance
 - [ ] 9.5 `render --format` and `publish` over the latest/selected run
-- [ ] 9.6 `doctor` — check git / gh / configured agent binaries (present + authenticated), report status
-- [ ] 9.7 Preflight: `review` checks the agent binary; `publish` checks `gh`; fail fast with a recovery suggestion
-- [ ] 9.8 Tests: argument parsing, end-to-end on a fixture monorepo (mock agent + mock `gh`)
+- [x] 9.6 `doctor` — check git / gh / configured agent binaries (present + authenticated), report status
+- [x] 9.7 Preflight: `review` checks the agent binary; `publish` checks `gh`; fail fast with a recovery suggestion
+- [x] 9.8 Tests: argument parsing, end-to-end on a fixture monorepo (mock agent + mock `gh`)
 
 ## 10. Robustness, edge cases & tool preflight
 
-- [ ] 10.1 Tool preflight + `doctor`: distinct errors for missing/unauthenticated agent, missing `gh`, missing `git`
+- [x] 10.1 Tool preflight + `doctor`: distinct errors for missing/unauthenticated agent, missing `gh`, missing `git`
 - [x] 10.2 config: no `baton.toml` found; no resolvable `[agent]`; duplicate review/skill names; review references undefined skill; `disabled_reviews` unknown name (no-op); unknown TOML keys (lenient warn)
 - [x] 10.3 scope discovery: do not follow symlinked directories; never escape the repo root
 - [x] 10.4 diff: invalid/unfetched base ref; empty diff (exit 0); rename across scope boundary (new path wins); binary & deleted files; quoted/space/unicode paths in `diff --git` headers

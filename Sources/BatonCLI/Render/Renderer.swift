@@ -75,7 +75,7 @@ enum Renderer {
             }
         }
         let payload = Payload(base: run.manifest.base, headSHA: run.manifest.headSHA, results: run.results)
-        return String(bytes: try JSONCodec.encodePrettySorted(payload), encoding: .utf8) ?? ""
+        return try String(bytes: JSONCodec.encodePrettySorted(payload), encoding: .utf8) ?? ""
     }
 
     // MARK: - GitHub formats
@@ -91,7 +91,7 @@ enum Renderer {
             return InlineComment(path: finding.file, line: line, body: GitHubPresentation.inlineCommentBody(finding))
         }
         let payload = Payload(body: BatonMarker.lastReviewed(headSHA), comments: comments)
-        return String(bytes: try JSONCodec.encodePretty(payload), encoding: .utf8) ?? ""
+        return try String(bytes: JSONCodec.encodePretty(payload), encoding: .utf8) ?? ""
     }
 
     private static func checkRun(_ run: LoadedRun, headSHA: String) throws -> String {
@@ -120,7 +120,7 @@ enum Renderer {
                 )
             )
         }
-        return String(bytes: try JSONCodec.encodePretty(Payload(checkRuns: runs)), encoding: .utf8) ?? ""
+        return try String(bytes: JSONCodec.encodePretty(Payload(checkRuns: runs)), encoding: .utf8) ?? ""
     }
 
     private static func githubSummary(_ run: LoadedRun) -> String {

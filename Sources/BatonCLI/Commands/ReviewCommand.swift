@@ -1,0 +1,152 @@
+import ArgumentParser
+import BatonKit
+import Foundation
+
+/// `baton review [name]` — discover scopes, cascade config, resolve the diff, and
+/// run the review orchestration.
+struct ReviewCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "review",
+        abstract: "Run configured reviews over the resolved diff."
+    )
+
+    @OptionGroup var global: GlobalOptions
+
+    @Argument(help: "Run only the named review (otherwise all reviews run).")
+    var name: String?
+
+    @Option(help: "Diff base (takes precedence over scope defaults).")
+    var base: String?
+
+    @Option(help: "Override the agent kind (\(AgentKind.listForHelp)).")
+    var agent: AgentKind?
+
+    @Option(help: "Override the agent model.")
+    var model: String?
+
+    @Flag(help: "Emit findings as machine-readable JSON.")
+    var json = false
+
+    @Option(name: .customLong("max-concurrency"), help: "Maximum concurrent (scope, review) tasks.")
+    var maxConcurrency: Int?
+
+    @Option(help: "Repository root to operate on.")
+    var repo: String?
+
+    @Flag(name: .customLong("allow-unpinned"), help: "Permit remote skills without a SHA ref.")
+    var allowUnpinned = false
+
+    func run() async throws {
+        try await present(global.outputMode) {
+            let root = try CLISupport.resolveRepoRoot(repo)
+            let git = GitRunner(repoRoot: root)
+            let discovery = try ScopeDiscovery.discover(repoRoot: root)
+            emitWarnings(discovery.warnings)
+
+            let effectives = try discovery.scopes.map { try Cascade.effective(for: $0, in: discovery.scopes) }
+            try validateNamedReview(effectives)
+            try preflightAgents(effectives)
+
+            let resolvedBase = BaseResolver.resolve(flag: base, scopeDefault: rootDefaults(effectives)?.base)
+            let diff = try DiffCollector(git: git).collect(base: resolvedBase)
+            let headSHA = (try? git.revParse("HEAD")) ?? ""
+            let store = RunRecordStore(repoRoot: root)
+
+            if diff.isEmpty {
+                try store.write(runId: RunRecordStore.newRunId(), base: resolvedBase, headSHA: headSHA, tasks: [])
+                TerminalOutput.shared.out(NooraUI.info("No changes to review.", useColors: global.outputMode.useColors))
+                return
+            }
+
+            let plans = buildPlans(effectives: effectives, diff: diff, scopes: discovery.scopes, root: root)
+            let tasks = try await orchestrate(plans: plans, root: root, git: git)
+            try store.write(runId: RunRecordStore.newRunId(), base: resolvedBase, headSHA: headSHA, tasks: tasks)
+
+            try renderAndExit(store: store, tasks: tasks)
+        }
+    }
+
+    // MARK: - Steps
+
+    private func validateNamedReview(_ effectives: [EffectiveConfig]) throws {
+        guard let name else { return }
+        let available = Set(effectives.flatMap { $0.reviews.map(\.name) })
+        if !available.contains(name) {
+            throw CLIError.namedReviewMissing(name: name, available: available.sorted())
+        }
+    }
+
+    private func preflightAgents(_ effectives: [EffectiveConfig]) throws {
+        var binaries: Set<String> = []
+        for effective in effectives where !effective.reviews.isEmpty {
+            guard let kind = agent ?? effective.agent?.kind else { continue }
+            let configBinary = agent == nil ? effective.agent?.binary : nil
+            try binaries.insert(AgentToolPreflight.resolveBinary(kind: kind, configBinary: configBinary))
+        }
+        for binary in binaries {
+            try AgentToolPreflight.verify(binary: binary, agent: binary)
+        }
+    }
+
+    private func buildPlans(
+        effectives: [EffectiveConfig],
+        diff: RepoDiff,
+        scopes: [ScopeConfig],
+        root: URL
+    ) -> [ScopePlan] {
+        let groups = DiffRouter.group(diff, scopes: scopes)
+        return effectives.compactMap { effective in
+            let files = groups[effective.scopePath] ?? []
+            guard !files.isEmpty else { return nil }
+            let configDir = effective.scopePath.isEmpty
+                ? root
+                : root.appendingPathComponent(effective.scopePath, isDirectory: true)
+            return ScopePlan(config: effective, files: files, configDir: configDir)
+        }
+    }
+
+    private func orchestrate(plans: [ScopePlan], root: URL, git: GitRunner) async throws -> [CompletedTask] {
+        let resolver = SkillResolver(
+            repoRoot: root,
+            cacheDir: SkillResolver.defaultCacheDir(),
+            git: git,
+            allowUnpinned: allowUnpinned
+        )
+        let orchestrator = ReviewOrchestrator(repoRoot: root, agent: LiveReviewAgent(), skills: resolver)
+        return try await orchestrator.run(scopes: plans, options: .init(
+            onlyReview: name,
+            agentOverride: agent,
+            modelOverride: model,
+            maxConcurrencyOverride: maxConcurrency
+        ))
+    }
+
+    private func renderAndExit(store: RunRecordStore, tasks: [CompletedTask]) throws {
+        let run = try store.load(runId: nil)
+        if tasks.isEmpty {
+            TerminalOutput.shared.out(NooraUI.info("Nothing to review.", useColors: global.outputMode.useColors))
+        } else {
+            let format: RenderFormat = json ? .json : .terminal
+            let output = try Renderer.render(
+                run: run,
+                format: format,
+                headSHA: nil,
+                useColors: global.outputMode.useColors
+            )
+            TerminalOutput.shared.out(output)
+        }
+        if ReviewOutcome(results: tasks.map(\.result)).shouldFailExit {
+            throw ExitCode.failure
+        }
+    }
+
+    private func rootDefaults(_ effectives: [EffectiveConfig]) -> EffectiveDefaults? {
+        (effectives.first { $0.scopePath.isEmpty } ?? effectives.first)?.defaults
+    }
+
+    private func emitWarnings(_ warnings: [String]) {
+        for warning in warnings {
+            TerminalOutput.shared.err(NooraUI.warning(warning, useColors: global.outputMode.useColors))
+        }
+    }
+}
