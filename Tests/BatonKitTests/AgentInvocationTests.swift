@@ -87,10 +87,13 @@ struct AgentInvocationTests {
         #expect(try AgentToolPreflight.resolveBinary(kind: .claude, configBinary: nil) == "claude")
     }
 
+    // POSIX paths/PATH semantics; Windows resolution is covered by ProcessLauncher.
+    #if !os(Windows)
     @Test("tool preflight detects binaries on PATH and explicit paths")
     func preflight() {
         #expect(AgentToolPreflight.isAvailable("/bin/sh"))
         #expect(AgentToolPreflight.isAvailable("sh", environment: ["PATH": "/bin:/usr/bin"]))
         #expect(!AgentToolPreflight.isAvailable("baton-no-such-binary-xyz", environment: ["PATH": "/bin"]))
     }
+    #endif
 }

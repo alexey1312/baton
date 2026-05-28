@@ -1,5 +1,7 @@
 # Baton
 
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Falexey1312%2Fswift-baton%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/alexey1312/swift-baton)
+[![Swift](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Falexey1312%2Fswift-baton%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/alexey1312/swift-baton)
 [![CI](https://github.com/alexey1312/swift-baton/actions/workflows/ci.yml/badge.svg)](https://github.com/alexey1312/swift-baton/actions/workflows/ci.yml)
 [![Release](https://github.com/alexey1312/swift-baton/actions/workflows/release.yml/badge.svg)](https://github.com/alexey1312/swift-baton/actions/workflows/release.yml)
 [![Docs](https://github.com/alexey1312/swift-baton/actions/workflows/deploy-docc.yml/badge.svg)](https://alexey1312.github.io/baton/documentation/batoncli)
