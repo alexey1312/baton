@@ -107,10 +107,19 @@ public struct SkillResolver: Sendable {
         guard let bodyURL = bodyFileURL(in: dir, fileManager: fileManager) else {
             throw SkillError.missingSkillFile(name: skill.name, searchedPath: dir.path)
         }
+        // Local skills used to skip the symlink-escape check; running it here closes
+        // that gap and shares the trust boundary with the new references-inlining walk.
+        try assertNoSymlinkEscape(bodyURL, within: dir, skillName: skill.name)
         let body = try readBody(bodyURL, skillName: skill.name)
+        let augmented = try inlineSupportingMarkdown(
+            body: body,
+            bodyURL: bodyURL,
+            skillDir: dir,
+            skillName: skill.name
+        )
         return ResolvedSkill(
             name: skill.name,
-            body: body,
+            body: augmented,
             sourceDescription: "local: \(dir.path)"
         )
     }
@@ -173,9 +182,15 @@ public struct SkillResolver: Sendable {
         try assertNoSymlinkEscape(bodyURL, within: checkout, skillName: skill.name)
 
         let body = try readBody(bodyURL, skillName: skill.name)
+        let augmented = try inlineSupportingMarkdown(
+            body: body,
+            bodyURL: bodyURL,
+            skillDir: skillDir,
+            skillName: skill.name
+        )
         return ResolvedSkill(
             name: skill.name,
-            body: body,
+            body: augmented,
             sourceDescription: "remote: \(skill.source)\(skill.ref.map { "@\($0)" } ?? "")"
         )
     }
@@ -329,19 +344,7 @@ public struct SkillResolver: Sendable {
 
     // MARK: - File helpers
 
-    /// Return the body file URL (`SKILL.md` preferred, then `README.md`) in `dir`,
-    /// or `nil` when neither exists.
-    private func bodyFileURL(in dir: URL, fileManager: FileManager) -> URL? {
-        for candidate in ["SKILL.md", "README.md"] {
-            let url = dir.appendingPathComponent(candidate)
-            if fileManager.fileExists(atPath: url.path) {
-                return url
-            }
-        }
-        return nil
-    }
-
-    private func readBody(_ url: URL, skillName: String) throws -> String {
+    func readBody(_ url: URL, skillName: String) throws -> String {
         do {
             return try String(contentsOf: url, encoding: .utf8)
         } catch {
@@ -349,13 +352,8 @@ public struct SkillResolver: Sendable {
         }
     }
 
-    private func isDirectory(_ url: URL, fileManager: FileManager) -> Bool {
-        var isDir: ObjCBool = false
-        return fileManager.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
-    }
-
     /// Reject a body file that resolves, through symlinks, to a path outside `base`.
-    private func assertNoSymlinkEscape(_ url: URL, within base: URL, skillName: String) throws {
+    func assertNoSymlinkEscape(_ url: URL, within base: URL, skillName: String) throws {
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
         let resolvedBase = base.resolvingSymlinksInPath().standardizedFileURL
         var basePath = resolvedBase.path
