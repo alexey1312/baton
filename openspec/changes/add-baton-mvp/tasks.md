@@ -102,13 +102,13 @@
 
 - [x] 11.1 `openspec validate add-baton-mvp --strict` passes
 - [x] 11.2 `swift build` / `swift test` green on macOS and Linux (piped through xcsift)
-- [ ] 11.3 README quick start verified against a sample monorepo fixture
+- [x] 11.3 README quick start verified against a sample monorepo fixture
 
 ## 12. Tooling, CI, documentation & distribution (port from ExFig)
 
 - [x] 12.1 `mise.toml`: pin tools (swift 6.3, swiftlint, swiftformat, dprint, hk, actionlint, git-cliff, xcsift) + tasks (`build`/`test`/`lint`/`format`/`format-check`/`docs`/`changelog`); commit `mise.lock`
 - [x] 12.2 `hk.pkl` + `.githooks/`: `pre-commit` (swiftformat, swiftlint --strict, dprint, actionlint; auto-fix + restage) and `commit-msg` (conventional commits); delegate via `mise x -- hk run`; honor `HK=0`; align hk pin between `mise.toml` and `hk.pkl`
-- [ ] 12.3 Linter/formatter configs: `.swiftlint.yml`, `.swiftformat`, `dprint.json` (drop ExFig PKL/llms-specific bits)
+- [x] 12.3 Linter/formatter configs: `.swiftlint.yml`, `.swiftformat`, `dprint.json` (drop ExFig PKL/llms-specific bits)
 - [x] 12.4 CI `ci.yml`: triggers push `main` + PR, concurrency-cancel; `lint` job (`format-check` + `lint` + `actionlint`) → `build-macos` + `build-linux` (swift:6.3, xcsift, `.build` cache) + `build-windows` (best-effort)
 - [x] 12.5 DocC: `Baton.docc` catalog on the executable target; `swift-docc-plugin` (`#if !os(Windows)`); `docs` task generates static-hosting site (base path `baton`) + redirect `index.html`
 - [x] 12.6 `deploy-docc.yml`: build + deploy DocC to GitHub Pages on `v*` tags + manual dispatch (`pages: write`, `id-token: write`)
