@@ -47,8 +47,8 @@ struct RunRecordTests {
         try withTempRepo { root in
             let store = RunRecordStore(repoRoot: root)
             let task = completed(scope: "web/api", review: "a/b", findings: [])
-            let dir = try store.write(runId: "run2", base: "HEAD", headSHA: "sha", tasks: [task])
-            let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+            let outcome = try store.write(runId: "run2", base: "HEAD", headSHA: "sha", tasks: [task])
+            let files = try FileManager.default.contentsOfDirectory(atPath: outcome.runDirectory.path)
             #expect(files.contains("web__api--a__b.json"))
             #expect(!files.contains { $0.contains("/") })
         }
@@ -58,13 +58,13 @@ struct RunRecordTests {
     func rootScopeName() throws {
         try withTempRepo { root in
             let store = RunRecordStore(repoRoot: root)
-            let dir = try store.write(
+            let outcome = try store.write(
                 runId: "r",
                 base: "HEAD",
                 headSHA: "s",
                 tasks: [completed(scope: "", review: "sec", findings: [])]
             )
-            let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+            let files = try FileManager.default.contentsOfDirectory(atPath: outcome.runDirectory.path)
             #expect(files.contains("root--sec.json"))
         }
     }

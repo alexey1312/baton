@@ -97,7 +97,7 @@ public struct RunRecordStore: Sendable {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let raw = String(UInt32.random(in: 0 ... 0xFF_FFFF), radix: 16)
+        let raw = String(UInt32.random(in: 0 ... 0xFFFFFF), radix: 16)
         let suffix = String(repeating: "0", count: max(0, 6 - raw.count)) + raw
         return "\(formatter.string(from: date))-\(suffix)"
     }
@@ -132,13 +132,21 @@ public struct RunRecordStore: Sendable {
         }
     }
 
+    /// Outcome of a ``RunRecordStore.write(...)`` call. `databaseErrors` is
+    /// non-empty when one of the SQLite write targets failed; JSON artifacts
+    /// remain the source of truth in that case.
+    public struct WriteOutcome: Sendable {
+        public var runDirectory: URL
+        public var databaseErrors: [BatonDatabaseError]
+    }
+
     /// Write a full run: per-task `.json`/`.log`/`.prompt.md`, a `manifest.json`,
-    /// and update the `latest` pointer. Returns the run directory.
+    /// and update the `latest` pointer.
     ///
     /// When `database` is supplied, the run is also recorded in SQLite *after*
     /// the on-disk artifacts succeed. A database failure does not abort the
-    /// write — JSON remains the source of truth — but its errors can be read
-    /// back via ``RunDatabaseStore.lastErrors()``.
+    /// write — JSON remains the source of truth — and its errors are returned
+    /// in ``WriteOutcome/databaseErrors`` for the caller to surface.
     @discardableResult
     public func write(
         runId: String,
@@ -146,7 +154,7 @@ public struct RunRecordStore: Sendable {
         headSHA: String,
         tasks: [CompletedTask],
         database: DatabaseHook? = nil
-    ) throws -> URL {
+    ) throws -> WriteOutcome {
         let runDir = runsDirectory.appendingPathComponent(runId, isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: runDir, withIntermediateDirectories: true)
@@ -172,17 +180,26 @@ public struct RunRecordStore: Sendable {
         let manifest = RunManifest(
             runId: runId, base: base, headSHA: headSHA, createdAt: Date(), tasks: summaries
         )
-        let manifestData = (try? JSONCodec.encodeWithISO8601DatePretty(manifest)) ?? Data()
-        try writeData(manifestData, to: runDir.appendingPathComponent("manifest.json"))
+        let manifestURL = runDir.appendingPathComponent("manifest.json")
+        let manifestData: Data
+        do {
+            manifestData = try JSONCodec.encodeWithISO8601DatePretty(manifest)
+        } catch {
+            throw RunRecordError.writeFailed(path: manifestURL.path, underlying: "\(error)")
+        }
+        try writeData(manifestData, to: manifestURL)
 
         // Update the latest pointer (a plain file holding the run id).
         try writeData(Data(runId.utf8), to: runsDirectory.appendingPathComponent("latest"))
 
+        var databaseErrors: [BatonDatabaseError] = []
         if let hook = database {
-            hook.store.recordRun(Self.makeDatabaseInput(manifest: manifest, tasks: tasks, hook: hook))
+            databaseErrors = hook.store.recordRun(
+                Self.makeDatabaseInput(manifest: manifest, tasks: tasks, hook: hook)
+            )
         }
 
-        return runDir
+        return WriteOutcome(runDirectory: runDir, databaseErrors: databaseErrors)
     }
 
     private static func makeDatabaseInput(
