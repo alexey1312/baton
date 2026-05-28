@@ -26,20 +26,23 @@ public enum TextTable {
     }
 
     /// Render a horizontal bar chart cell using full-block characters.
-    /// `value` and `max` should be ≥0; max==0 returns "".
+    /// Negative `value` and `max == 0` both render as an empty cell so the
+    /// caller doesn't have to special-case "no data" rows.
     public static func bar(value: Int, max: Int, width: Int = 20) -> String {
-        guard max > 0, width > 0 else { return "" }
-        let length = max == 0 ? 0 : value * width / max
+        guard max > 0, width > 0, value > 0 else { return "" }
+        let length = min(width, value * width / max)
         return String(repeating: "█", count: length)
     }
 
-    /// Group integers with a thin-space-style separator (`,`) so `12345`
-    /// renders as `12,345`. Locale-independent (we want stable CI output).
+    /// Group integers with a comma separator so `12345` renders as `12,345`.
+    /// Locale-independent (we want stable CI output regardless of host locale).
     public static func formatNumber(_ value: Int) -> String {
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
         formatter.groupingSeparator = ","
+        formatter.groupingSize = 3
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 }
