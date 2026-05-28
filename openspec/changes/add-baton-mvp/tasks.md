@@ -22,14 +22,14 @@
 
 ## 3. diff-routing
 
-- [ ] 3.1 `base` resolution: `--base` > scope default > `HEAD`
-- [ ] 3.2 Collect diff (`git diff --find-renames` + untracked) with careful `diff --git` header parsing
-- [ ] 3.3 `owner`: deepest-ancestor scope; drop files outside any scope
-- [ ] 3.4 `grouping`: partition diff by scope
-- [ ] 3.5 focus-mode: detect PR context from GH Actions env; recover previous review SHA from PR (Baton check runs, fallback `baton:last-reviewed` marker); compute focus diff
-- [ ] 3.6 Structural chunking by file/hunk when scope diff exceeds `diff_budget` (never mid-file)
-- [ ] 3.7 `glob` filtering of files to a review within a scope
-- [ ] 3.8 Tests: routing, grouping, chunking boundaries, glob filters, focus-mode
+- [x] 3.1 `base` resolution: `--base` > scope default > `HEAD`
+- [x] 3.2 Collect diff (`git diff --find-renames` + untracked) with careful `diff --git` header parsing
+- [x] 3.3 `owner`: deepest-ancestor scope; drop files outside any scope
+- [x] 3.4 `grouping`: partition diff by scope
+- [x] 3.5 focus-mode: detect PR context from GH Actions env; recover previous review SHA from PR (Baton check runs, fallback `baton:last-reviewed` marker); compute focus diff
+- [x] 3.6 Structural chunking by file/hunk when scope diff exceeds `diff_budget` (never mid-file)
+- [x] 3.7 `glob` filtering of files to a review within a scope
+- [x] 3.8 Tests: routing, grouping, chunking boundaries, glob filters, focus-mode
 
 ## 4. agent-execution
 
@@ -89,9 +89,9 @@
 - [ ] 10.1 Tool preflight + `doctor`: distinct errors for missing/unauthenticated agent, missing `gh`, missing `git`
 - [x] 10.2 config: no `baton.toml` found; no resolvable `[agent]`; duplicate review/skill names; review references undefined skill; `disabled_reviews` unknown name (no-op); unknown TOML keys (lenient warn)
 - [x] 10.3 scope discovery: do not follow symlinked directories; never escape the repo root
-- [ ] 10.4 diff: invalid/unfetched base ref; empty diff (exit 0); rename across scope boundary (new path wins); binary & deleted files; quoted/space/unicode paths in `diff --git` headers
-- [ ] 10.5 chunking: single file > budget → by-hunk fallback → whole-hunk + `truncated` flag + warning
-- [ ] 10.6 focus-mode: previous review SHA unreachable (force-push) → fall back to full base diff + warn
+- [x] 10.4 diff: invalid/unfetched base ref; empty diff (exit 0); rename across scope boundary (new path wins); binary & deleted files; quoted/space/unicode paths in `diff --git` headers
+- [x] 10.5 chunking: single file > budget → by-hunk fallback → whole-hunk + `truncated` flag + warning
+- [x] 10.6 focus-mode: previous review SHA unreachable (force-push) → fall back to full base diff + warn
 - [ ] 10.7 agent: binary missing / non-zero exit / exit-0-with-empty-stdout (auth/billing error on stderr) / unauthenticated / user `args` conflicting with required flags
 - [ ] 10.8 skills: clone failure, missing `ref`, ref not found, missing `subpath`, symlink escape, `allowed_skill_sources` glob semantics, git unavailable
 - [ ] 10.9 orchestration: dedupe findings merged across chunks; clamp/drop invalid finding fields; sanitize scope/review names in artifact filenames; disk-write failure
