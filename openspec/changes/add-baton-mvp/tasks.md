@@ -42,11 +42,11 @@
 
 ## 5. skill-resolution
 
-- [ ] 5.1 Local sources (`./ ../ / ~`) relative to declaring `baton.toml`
-- [ ] 5.2 Remote `owner/repo` + `owner/repo/skill` (skills.sh convention) shallow-clone into cache (`BATON_CACHE_DIR`)
-- [ ] 5.3 Enforce SHA `ref` for remote skills (unless `--allow-unpinned`); check `allowed_skill_sources`
-- [ ] 5.4 Read body from `SKILL.md`/`README.md`; embed in delimited untrusted block in the prompt
-- [ ] 5.5 Tests: resolution forms, pin enforcement, allowlist, untrusted-block isolation
+- [x] 5.1 Local sources (`./ ../ / ~`) relative to declaring `baton.toml`
+- [x] 5.2 Remote `owner/repo` + `owner/repo/skill` (skills.sh convention) shallow-clone into cache (`BATON_CACHE_DIR`)
+- [x] 5.3 Enforce SHA `ref` for remote skills (unless `--allow-unpinned`); check `allowed_skill_sources`
+- [x] 5.4 Read body from `SKILL.md`/`README.md`; embed in delimited untrusted block in the prompt
+- [x] 5.5 Tests: resolution forms, pin enforcement, allowlist, untrusted-block isolation
 
 ## 6. review-orchestration
 
@@ -93,7 +93,7 @@
 - [x] 10.5 chunking: single file > budget → by-hunk fallback → whole-hunk + `truncated` flag + warning
 - [x] 10.6 focus-mode: previous review SHA unreachable (force-push) → fall back to full base diff + warn
 - [x] 10.7 agent: binary missing / non-zero exit / exit-0-with-empty-stdout (auth/billing error on stderr) / unauthenticated / user `args` conflicting with required flags
-- [ ] 10.8 skills: clone failure, missing `ref`, ref not found, missing `subpath`, symlink escape, `allowed_skill_sources` glob semantics, git unavailable
+- [x] 10.8 skills: clone failure, missing `ref`, ref not found, missing `subpath`, symlink escape, `allowed_skill_sources` glob semantics, git unavailable
 - [ ] 10.9 orchestration: dedupe findings merged across chunks; clamp/drop invalid finding fields; sanitize scope/review names in artifact filenames; disk-write failure
 - [ ] 10.10 publish: token without write permission (fork PR), Check Run needs GitHub App token (local PAT) → degrade to PR-review-only + warn, rate limit / 5xx with backoff, stale head SHA, comment-count limits, idempotent re-run
 - [ ] 10.11 render: missing/corrupt run record; dangling `latest`; zero findings emits valid output
