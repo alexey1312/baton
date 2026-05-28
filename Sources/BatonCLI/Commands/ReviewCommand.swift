@@ -51,16 +51,34 @@ struct ReviewCommand: AsyncParsableCommand {
             let diff = try DiffCollector(git: git).collect(base: resolvedBase)
             let headSHA = (try? git.revParse("HEAD")) ?? ""
             let store = RunRecordStore(repoRoot: root)
+            let repoIdentity = RepoIdentity.resolve(repoRoot: root)
+            let database = RunDatabaseStore(location: .both(repoRoot: root))
 
             if diff.isEmpty {
-                try store.write(runId: RunRecordStore.newRunId(), base: resolvedBase, headSHA: headSHA, tasks: [])
+                let hook = RunRecordStore.DatabaseHook(
+                    store: database, repo: repoIdentity, status: .empty, cliVersion: Self.cliVersion
+                )
+                try store.write(
+                    runId: RunRecordStore.newRunId(),
+                    base: resolvedBase, headSHA: headSHA, tasks: [], database: hook
+                )
+                emitDatabaseWarnings(database)
                 TerminalOutput.shared.out(NooraUI.info("No changes to review.", useColors: global.outputMode.useColors))
                 return
             }
 
             let plans = buildPlans(effectives: effectives, diff: diff, scopes: discovery.scopes, root: root)
             let tasks = try await orchestrate(plans: plans, root: root, git: git)
-            try store.write(runId: RunRecordStore.newRunId(), base: resolvedBase, headSHA: headSHA, tasks: tasks)
+            let outcome = ReviewOutcome(results: tasks.map(\.result))
+            let status: RunStatus = outcome.shouldFailExit ? .failed : .success
+            let hook = RunRecordStore.DatabaseHook(
+                store: database, repo: repoIdentity, status: status, cliVersion: Self.cliVersion
+            )
+            try store.write(
+                runId: RunRecordStore.newRunId(),
+                base: resolvedBase, headSHA: headSHA, tasks: tasks, database: hook
+            )
+            emitDatabaseWarnings(database)
 
             try renderAndExit(store: store, tasks: tasks)
         }
@@ -148,5 +166,16 @@ struct ReviewCommand: AsyncParsableCommand {
         for warning in warnings {
             TerminalOutput.shared.err(NooraUI.warning(warning, useColors: global.outputMode.useColors))
         }
+    }
+
+    private func emitDatabaseWarnings(_ database: RunDatabaseStore) {
+        for error in database.lastErrors() {
+            let message = error.errorDescription ?? "Database write failed"
+            TerminalOutput.shared.err(NooraUI.warning(message, useColors: global.outputMode.useColors))
+        }
+    }
+
+    private static var cliVersion: String {
+        Baton.configuration.version.isEmpty ? "dev" : Baton.configuration.version
     }
 }

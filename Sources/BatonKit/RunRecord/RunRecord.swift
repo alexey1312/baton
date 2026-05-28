@@ -90,12 +90,16 @@ public struct RunRecordStore: Sendable {
             .appendingPathComponent("runs", isDirectory: true)
     }
 
-    /// Generate a sortable run id (timestamp-based).
+    /// Generate a sortable run id. The timestamp prefix keeps `latest` and
+    /// directory listings sorted; the 6-hex suffix prevents collisions when
+    /// two runs land in the same second (CI matrix, parallel invocations).
     public static func newRunId(date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return formatter.string(from: date)
+        let raw = String(UInt32.random(in: 0 ... 0xFF_FFFF), radix: 16)
+        let suffix = String(repeating: "0", count: max(0, 6 - raw.count)) + raw
+        return "\(formatter.string(from: date))-\(suffix)"
     }
 
     /// Flatten path separators so a scope/review name is filesystem-safe.
@@ -106,10 +110,43 @@ public struct RunRecordStore: Sendable {
             .replacingOccurrences(of: "\\", with: "__")
     }
 
+    /// Inputs needed to record a run to the database. Kept as a struct to keep
+    /// ``write``'s parameter count under swiftlint's limit and to make the DB
+    /// hook optional without changing the rest of the call shape.
+    public struct DatabaseHook: Sendable {
+        public var store: RunDatabaseStore
+        public var repo: RepoIdentity
+        public var status: RunStatus
+        public var cliVersion: String?
+
+        public init(
+            store: RunDatabaseStore,
+            repo: RepoIdentity,
+            status: RunStatus,
+            cliVersion: String? = nil
+        ) {
+            self.store = store
+            self.repo = repo
+            self.status = status
+            self.cliVersion = cliVersion
+        }
+    }
+
     /// Write a full run: per-task `.json`/`.log`/`.prompt.md`, a `manifest.json`,
     /// and update the `latest` pointer. Returns the run directory.
+    ///
+    /// When `database` is supplied, the run is also recorded in SQLite *after*
+    /// the on-disk artifacts succeed. A database failure does not abort the
+    /// write — JSON remains the source of truth — but its errors can be read
+    /// back via ``RunDatabaseStore.lastErrors()``.
     @discardableResult
-    public func write(runId: String, base: String, headSHA: String, tasks: [CompletedTask]) throws -> URL {
+    public func write(
+        runId: String,
+        base: String,
+        headSHA: String,
+        tasks: [CompletedTask],
+        database: DatabaseHook? = nil
+    ) throws -> URL {
         let runDir = runsDirectory.appendingPathComponent(runId, isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: runDir, withIntermediateDirectories: true)
@@ -140,7 +177,48 @@ public struct RunRecordStore: Sendable {
 
         // Update the latest pointer (a plain file holding the run id).
         try writeData(Data(runId.utf8), to: runsDirectory.appendingPathComponent("latest"))
+
+        if let hook = database {
+            hook.store.recordRun(Self.makeDatabaseInput(manifest: manifest, tasks: tasks, hook: hook))
+        }
+
         return runDir
+    }
+
+    private static func makeDatabaseInput(
+        manifest: RunManifest,
+        tasks: [CompletedTask],
+        hook: DatabaseHook
+    ) -> RunRecordInput {
+        let taskInputs = tasks.map { task -> TaskRecordInput in
+            let result = task.result
+            return TaskRecordInput(
+                scope: result.scope,
+                review: result.review,
+                agentKind: result.agentKind ?? "unknown",
+                model: result.model,
+                durationMs: result.durationMs,
+                inputTokens: result.usage?.inputTokens,
+                outputTokens: result.usage?.outputTokens,
+                costUSD: result.usage?.totalCostUSD,
+                failed: result.failed,
+                errorMessage: result.errorMessage,
+                truncatedFilesCount: result.truncatedFiles.count,
+                warningsCount: result.warnings.count,
+                failOn: result.failOn.rawValue,
+                findings: result.findings
+            )
+        }
+        return RunRecordInput(
+            runId: manifest.runId,
+            repo: hook.repo,
+            baseRef: manifest.base,
+            headSHA: manifest.headSHA,
+            createdAt: manifest.createdAt,
+            status: hook.status,
+            tasks: taskInputs,
+            cliVersion: hook.cliVersion
+        )
     }
 
     /// Load a saved run. `nil` resolves the `latest` pointer.

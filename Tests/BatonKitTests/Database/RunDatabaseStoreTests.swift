@@ -10,14 +10,13 @@ struct RunDatabaseStoreTests {
         let tempRoot = makeTempDir()
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        DatabasePathResolver.setGlobalDirectoryOverride(tempRoot)
-        defer { DatabasePathResolver.setGlobalDirectoryOverride(nil); BatonDatabase._resetForTesting() }
+        defer { BatonDatabase._resetForTesting() }
 
-        let store = RunDatabaseStore(location: .global)
+        let store = RunDatabaseStore(location: .perRepo(repoRoot: tempRoot))
         store.recordRun(makeRoundTripInput())
         #expect(store.lastErrors().isEmpty)
 
-        let database = try BatonDatabase.open(at: DatabasePathResolver.globalDatabaseURL)
+        let database = try BatonDatabase.open(at: DatabasePathResolver.perRepoDatabaseURL(repoRoot: tempRoot))
         let connection = database.connection
 
         let runCount = try connection.scalar("SELECT COUNT(*) FROM runs") as? Int64
@@ -77,10 +76,9 @@ struct RunDatabaseStoreTests {
         let tempRoot = makeTempDir()
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        DatabasePathResolver.setGlobalDirectoryOverride(tempRoot)
-        defer { DatabasePathResolver.setGlobalDirectoryOverride(nil); BatonDatabase._resetForTesting() }
+        defer { BatonDatabase._resetForTesting() }
 
-        let store = RunDatabaseStore(location: .global)
+        let store = RunDatabaseStore(location: .perRepo(repoRoot: tempRoot))
         let identity = RepoIdentity.resolve(repoRoot: URL(fileURLWithPath: "/tmp/example"))
         let input = RunRecordInput(
             runId: "run-mixed",
@@ -95,7 +93,7 @@ struct RunDatabaseStoreTests {
             ]
         )
         store.recordRun(input)
-        let database = try BatonDatabase.open(at: DatabasePathResolver.globalDatabaseURL)
+        let database = try BatonDatabase.open(at: DatabasePathResolver.perRepoDatabaseURL(repoRoot: tempRoot))
         let sql = "SELECT agent_kind FROM runs WHERE run_id = ?"
         let agent = try database.connection.scalar(sql, "run-mixed") as? String
         #expect(agent == "mixed")
