@@ -83,4 +83,37 @@ struct RenderTests {
             #expect(!output.isEmpty)
         }
     }
+
+    /// Write a fixture run carrying a single failed (e.g. timed-out) task.
+    private func fixtureFailedRun() throws -> (LoadedRun, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("baton-render-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let store = RunRecordStore(repoRoot: root)
+        let task = CompletedTask(
+            result: ReviewTaskResult(
+                scope: "ios", review: "security", findings: [], failOn: .high,
+                taskFailed: true, errorMessage: "Agent 'gemini' timed out after 600s"
+            ),
+            prompt: "P",
+            rawOutput: ""
+        )
+        try store.write(runId: "run1", base: "origin/main", headSHA: "sha123", tasks: [task])
+        return try (store.load(runId: nil), root)
+    }
+
+    @Test("a failed task surfaces its error instead of rendering as 'No findings'")
+    func failedTaskSurfacesError() throws {
+        let (run, root) = try fixtureFailedRun()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let terminal = try Renderer.render(run: run, format: .terminal, headSHA: nil)
+        #expect(terminal.contains("ios / security"))
+        #expect(terminal.contains("timed out after 600s"))
+        #expect(!terminal.contains("No findings"))
+
+        let markdown = try Renderer.render(run: run, format: .markdown, headSHA: nil)
+        #expect(markdown.contains("timed out after 600s"))
+        #expect(!markdown.contains("No findings"))
+    }
 }

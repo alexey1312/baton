@@ -29,10 +29,18 @@ enum Renderer {
 
     private static func terminal(_ run: LoadedRun, useColors: Bool) -> String {
         let findings = run.results.flatMap(\.findings)
-        if findings.isEmpty {
+        let failures = run.results.filter(\.taskFailed)
+        if findings.isEmpty, failures.isEmpty {
             return NooraUI.success("No findings.", useColors: useColors)
         }
         var lines: [String] = []
+        for result in failures {
+            let detail = result.errorMessage ?? "review failed"
+            lines.append(NooraUI.error(
+                "\(displayScope(result.scope)) / \(result.review) — \(detail)",
+                useColors: useColors
+            ))
+        }
         for result in run.results where !result.findings.isEmpty {
             lines.append(scopeReviewHeader(result, useColors: useColors))
             for finding in result.findings {
@@ -49,10 +57,15 @@ enum Renderer {
 
     private static func markdown(_ run: LoadedRun) -> String {
         let findings = run.results.flatMap(\.findings)
-        if findings.isEmpty {
+        let failures = run.results.filter(\.taskFailed)
+        if findings.isEmpty, failures.isEmpty {
             return "# Baton review\n\nNo findings. ✅\n"
         }
         var sections = ["# Baton review\n"]
+        for result in failures {
+            let detail = result.errorMessage ?? "review failed"
+            sections.append("## ⚠️ \(displayScope(result.scope)) / \(result.review)\n\n\(detail)\n")
+        }
         for result in run.results where !result.findings.isEmpty {
             sections.append("## \(displayScope(result.scope)) / \(result.review)\n")
             for finding in result.findings {
