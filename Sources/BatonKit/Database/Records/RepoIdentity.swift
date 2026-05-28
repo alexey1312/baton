@@ -21,22 +21,17 @@ public struct RepoIdentity: Sendable, Equatable, Hashable {
     public static func resolve(repoRoot: URL) -> RepoIdentity {
         let canonical = repoRoot.resolvingSymlinksInPath().path
         let normalized = canonical.lowercased()
-        let id = String(fnv1a64(normalized), radix: 16, uppercase: false)
-            .padding(toLength: 16, withPad: "0", startingAt: 0)
+        let id = leftPadHex(FNV1a.hash(normalized), width: 16)
         let label = repoRoot.lastPathComponent.isEmpty ? canonical : repoRoot.lastPathComponent
         return RepoIdentity(id: id, label: label, absolutePath: canonical)
     }
 
-    /// FNV-1a 64-bit. Not cryptographic — we only need stable, well-distributed
-    /// 16-hex ids for filesystem paths.
-    private static func fnv1a64(_ string: String) -> UInt64 {
-        let offsetBasis: UInt64 = 0xCBF2_9CE4_8422_2325
-        let prime: UInt64 = 0x100_0000_01B3
-        var hash = offsetBasis
-        for byte in string.utf8 {
-            hash ^= UInt64(byte)
-            hash = hash &* prime
-        }
-        return hash
+    /// Left-pad a UInt64 hex representation to `width` digits with zeros.
+    /// Returns the natural fixed-width hex form so the id can round-trip back
+    /// through `UInt64(_:radix:)` if a caller ever needs to.
+    static func leftPadHex(_ value: UInt64, width: Int) -> String {
+        let hex = String(value, radix: 16, uppercase: false)
+        guard hex.count < width else { return hex }
+        return String(repeating: "0", count: width - hex.count) + hex
     }
 }
