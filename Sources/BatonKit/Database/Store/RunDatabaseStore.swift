@@ -92,38 +92,36 @@ public struct TaskRecordInput: Sendable {
 /// The store dispatches a single `RunRecordInput` to every path implied by
 /// the `location`, so a `.both(repoRoot:)` write goes to the global database
 /// and the per-repo database in turn. Failures on one path do not abort the
-/// other.
+/// other — they are returned to the caller, who decides whether to surface
+/// them.
 public struct RunDatabaseStore: Sendable {
     public let location: DatabaseLocation
-    /// Errors collected from per-database write attempts. Re-read via
-    /// ``lastErrors()`` immediately after a `recordRun` call.
-    private let errorBox = ErrorBox()
 
     public init(location: DatabaseLocation) {
         self.location = location
     }
 
-    public func lastErrors() -> [BatonDatabaseError] {
-        errorBox.snapshot()
-    }
-
     /// Record a run, its tasks, and the findings for each task.
     ///
-    /// Best-effort: a failure on one configured database file is captured in
-    /// ``lastErrors`` and emitted as a warning by the caller. JSON artifacts
-    /// remain the source of truth.
-    public func recordRun(_ input: RunRecordInput) {
-        errorBox.reset()
+    /// Best-effort: a failure on one configured database file does not stop
+    /// the write to the next path. Any errors are returned per-target; JSON
+    /// artifacts remain the source of truth.
+    public func recordRun(_ input: RunRecordInput) -> [BatonDatabaseError] {
+        var errors: [BatonDatabaseError] = []
         for target in DatabasePathResolver.writeTargets(for: location) {
             do {
                 let database = try BatonDatabase.open(at: target)
                 try write(input, to: database.connection)
             } catch let error as BatonDatabaseError {
-                errorBox.append(error)
+                errors.append(error)
             } catch {
-                errorBox.append(BatonDatabaseError.queryFailed(operation: "recordRun", underlying: "\(error)"))
+                errors.append(.queryFailed(
+                    operation: "recordRun(\(target.path))",
+                    underlying: "\(error)"
+                ))
             }
         }
+        return errors
     }
 
     // MARK: - Write
@@ -260,9 +258,7 @@ public struct RunDatabaseStore: Sendable {
     public static func makeFindingId(taskId: String, finding: Finding) -> String {
         let line = finding.line.map(String.init) ?? "_"
         let key = "\(finding.file)|\(line)|\(finding.severity.rawValue)|\(finding.title)"
-        let hash = String(fnv1a64(key), radix: 16, uppercase: false)
-            .padding(toLength: 16, withPad: "0", startingAt: 0)
-            .prefix(8)
+        let hash = RepoIdentity.leftPadHex(FNV1a.hash(key), width: 16).prefix(8)
         return "\(taskId):\(hash)"
     }
 
@@ -271,17 +267,6 @@ public struct RunDatabaseStore: Sendable {
             .replacingOccurrences(of: "/", with: "__")
             .replacingOccurrences(of: "\\", with: "__")
             .replacingOccurrences(of: ":", with: "_")
-    }
-
-    private static func fnv1a64(_ string: String) -> UInt64 {
-        let offsetBasis: UInt64 = 0xCBF2_9CE4_8422_2325
-        let prime: UInt64 = 0x100_0000_01B3
-        var hash = offsetBasis
-        for byte in string.utf8 {
-            hash ^= UInt64(byte)
-            hash = hash &* prime
-        }
-        return hash
     }
 
     // MARK: - Internal totals
@@ -294,26 +279,5 @@ public struct RunDatabaseStore: Sendable {
         var totalCostUSD: Double?
         var durationMs: Int?
         var agentKind: String?
-    }
-
-    /// Tiny lock-guarded box for collecting errors across writes.
-    private final class ErrorBox: @unchecked Sendable {
-        private var errors: [BatonDatabaseError] = []
-        private let lock = NSLock()
-
-        func reset() {
-            lock.lock(); defer { lock.unlock() }
-            errors.removeAll()
-        }
-
-        func append(_ error: BatonDatabaseError) {
-            lock.lock(); defer { lock.unlock() }
-            errors.append(error)
-        }
-
-        func snapshot() -> [BatonDatabaseError] {
-            lock.lock(); defer { lock.unlock() }
-            return errors
-        }
     }
 }

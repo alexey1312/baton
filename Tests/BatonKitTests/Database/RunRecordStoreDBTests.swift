@@ -35,10 +35,10 @@ struct RunRecordStoreDBTests {
         )
 
         let runId = RunRecordStore.newRunId()
-        try store.write(
+        let outcome = try store.write(
             runId: runId, base: "origin/main", headSHA: "sha", tasks: [task], database: hook
         )
-        #expect(database.lastErrors().isEmpty)
+        #expect(outcome.databaseErrors.isEmpty)
 
         let perRepo = try BatonDatabase.open(at: DatabasePathResolver.perRepoDatabaseURL(repoRoot: repoRoot))
         let connection = perRepo.connection
@@ -52,9 +52,10 @@ struct RunRecordStoreDBTests {
     func newRunIdSuffix() {
         let runId = RunRecordStore.newRunId()
         // Shape: 8 + 1 + 6 + 1 + 6 = 22 chars.
-        #expect(runId.count == 22)
         let suffix = String(runId.suffix(6))
-        #expect(suffix.allSatisfy { $0.isHexDigit })
+        let suffixIsHex = suffix.allSatisfy(\.isHexDigit)
+        #expect(runId.count == 22)
+        #expect(suffixIsHex)
     }
 
     // MARK: - Helpers

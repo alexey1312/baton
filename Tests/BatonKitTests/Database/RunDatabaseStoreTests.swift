@@ -13,8 +13,8 @@ struct RunDatabaseStoreTests {
         defer { BatonDatabase._resetForTesting() }
 
         let store = RunDatabaseStore(location: .perRepo(repoRoot: tempRoot))
-        store.recordRun(makeRoundTripInput())
-        #expect(store.lastErrors().isEmpty)
+        let errors = store.recordRun(makeRoundTripInput())
+        #expect(errors.isEmpty)
 
         let database = try BatonDatabase.open(at: DatabasePathResolver.perRepoDatabaseURL(repoRoot: tempRoot))
         let connection = database.connection
@@ -92,7 +92,8 @@ struct RunDatabaseStoreTests {
                 TaskRecordInput(scope: "", review: "b", agentKind: "codex", failOn: "high"),
             ]
         )
-        store.recordRun(input)
+        let errors = store.recordRun(input)
+        #expect(errors.isEmpty)
         let database = try BatonDatabase.open(at: DatabasePathResolver.perRepoDatabaseURL(repoRoot: tempRoot))
         let sql = "SELECT agent_kind FROM runs WHERE run_id = ?"
         let agent = try database.connection.scalar(sql, "run-mixed") as? String
