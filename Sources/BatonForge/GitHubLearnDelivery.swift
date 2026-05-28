@@ -21,14 +21,14 @@ public struct GitHubLearnDelivery: LearnDelivering {
         do {
             if let existing = try await findExistingPR(request: request, owner: owner) {
                 try await updatePR(number: existing, request: request)
-                return LearnDeliveryReport(pullRequestNumber: existing, updated: true)
+                return LearnDeliveryReport(outcome: .updated(existing))
             }
             let number = try await createPR(request: request)
-            return LearnDeliveryReport(pullRequestNumber: number, created: true)
+            return LearnDeliveryReport(outcome: .created(number))
         } catch let error as ForgeError {
             guard case .writePermissionDenied = error else { throw error }
             return LearnDeliveryReport(
-                degradedToPreview: true,
+                outcome: .degradedToPreview,
                 warnings: [
                     "The token cannot open or update the learn pull request (a write-scoped GitHub App " +
                         "token is required, e.g. the Actions GITHUB_TOKEN). Emitted preview output instead.",
@@ -42,13 +42,15 @@ public struct GitHubLearnDelivery: LearnDelivering {
     private func findExistingPR(request: LearnDeliveryRequest, owner: String) async throws -> Int? {
         let path = "/repos/\(request.repo)/pulls?state=open&head=\(owner):\(request.branch)"
         let result = try await call(method: "GET", path: path, stdin: nil)
-        let items = LearnAPIBodies.decode([LearnAPIBodies.PRListItem].self, from: result.stdout) ?? []
+        // A parse failure here must NOT look like "no existing PR" — that would make
+        // delivery open a duplicate rolling PR and break the single-PR guarantee.
+        let items = try LearnAPIBodies.decode([LearnAPIBodies.PRListItem].self, from: result.stdout)
         return items.first?.number
     }
 
     // MARK: - Write
 
-    private func createPR(request: LearnDeliveryRequest) async throws -> Int? {
+    private func createPR(request: LearnDeliveryRequest) async throws -> Int {
         let json = try LearnAPIBodies.json(LearnAPIBodies.CreatePRRequest(
             title: request.title,
             head: request.branch,
@@ -57,7 +59,7 @@ public struct GitHubLearnDelivery: LearnDelivering {
             draft: request.draft
         ))
         let result = try await call(method: "POST", path: "/repos/\(request.repo)/pulls", stdin: json)
-        return LearnAPIBodies.decode(LearnAPIBodies.PRResponse.self, from: result.stdout)?.number
+        return try LearnAPIBodies.decode(LearnAPIBodies.PRResponse.self, from: result.stdout).number
     }
 
     private func updatePR(number: Int, request: LearnDeliveryRequest) async throws {
@@ -91,7 +93,9 @@ public struct GitHubLearnDelivery: LearnDelivering {
         let text = detail.lowercased()
         if text.contains("rate limit") || text.contains("429") { return .rateLimited(detail: detail) }
         if let status = httpStatus(text), (500 ... 599).contains(status) { return .serverError(detail: detail) }
-        let denied = text.contains("403") || text.contains("422") || text.contains("forbidden")
+        // 422 (Validation Failed) is a real error — e.g. "no commits between base and
+        // head" — and must NOT silently degrade to preview, so it is excluded here.
+        let denied = text.contains("403") || text.contains("forbidden")
             || text.contains("not accessible by integration") || text.contains("must have write access")
         return denied ? .writePermissionDenied(detail: detail) : .publishFailed(detail: detail)
     }

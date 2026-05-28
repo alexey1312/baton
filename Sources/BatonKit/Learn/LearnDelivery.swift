@@ -35,27 +35,42 @@ public struct LearnDeliveryRequest: Sendable, Equatable {
     }
 }
 
-/// What a delivery attempt did.
+/// What a delivery attempt did. The outcomes are mutually exclusive, so they are
+/// modeled as a sum type rather than independent booleans that could contradict
+/// each other (e.g. both `created` and `updated`).
 public struct LearnDeliveryReport: Sendable, Equatable {
-    public var pullRequestNumber: Int?
-    public var created: Bool
-    public var updated: Bool
-    /// True when the token could not open/update the PR and the run degraded to preview.
-    public var degradedToPreview: Bool
+    public enum Outcome: Sendable, Equatable {
+        case created(Int)
+        case updated(Int)
+        /// The token could not open/update the PR and the run fell back to preview.
+        case degradedToPreview
+    }
+
+    public var outcome: Outcome
     public var warnings: [String]
 
-    public init(
-        pullRequestNumber: Int? = nil,
-        created: Bool = false,
-        updated: Bool = false,
-        degradedToPreview: Bool = false,
-        warnings: [String] = []
-    ) {
-        self.pullRequestNumber = pullRequestNumber
-        self.created = created
-        self.updated = updated
-        self.degradedToPreview = degradedToPreview
+    public init(outcome: Outcome, warnings: [String] = []) {
+        self.outcome = outcome
         self.warnings = warnings
+    }
+
+    public var pullRequestNumber: Int? {
+        switch outcome {
+        case let .created(number), let .updated(number): number
+        case .degradedToPreview: nil
+        }
+    }
+
+    public var created: Bool {
+        if case .created = outcome { true } else { false }
+    }
+
+    public var updated: Bool {
+        if case .updated = outcome { true } else { false }
+    }
+
+    public var degradedToPreview: Bool {
+        if case .degradedToPreview = outcome { true } else { false }
     }
 }
 

@@ -100,7 +100,7 @@ min_signal    = 1        # min attributed Baton-thread count before proposing (d
 
 # Delivery (root scope only; ignored on descendants):
 branch         = "learn"          # rolling PR branch (default "learn")
-base           = "main"           # PR base branch
+base           = "main"           # PR base branch (defaults to "main")
 draft          = true             # open as a draft (default true)
 reviewers      = ["alice"]        # optional requested reviewers
 team_reviewers = ["platform"]     # optional requested team reviewers

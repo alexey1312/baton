@@ -161,6 +161,10 @@ public enum Cascade {
             if let v = learn.minSignal { result.minSignal = v; prov.record("learn.min_signal", file) }
             if let v = learn.enabled { result.enabled = v; prov.record("learn.enabled", file) }
         }
+        // Clamp to sane minimums: a 0/negative min_signal would make every scope
+        // pass volume gating, and a 0/negative lookback would read an empty window.
+        result.minSignal = max(result.minSignal, 1)
+        result.lookbackDays = max(result.lookbackDays, 1)
         // Delivery fields are read only from the repository-root scope (chain head).
         if let root = chain.first, let learn = root.config.learn {
             resolveLearnDelivery(learn, configPath: root.configPath, into: &result, &prov)

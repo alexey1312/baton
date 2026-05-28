@@ -32,8 +32,13 @@ enum LearnGit {
             for path in paths {
                 try git.run(["add", "--", path])
             }
-            // `commit` fails when nothing is staged; treat that as a no-op.
-            if (try? git.run(["commit", "-m", message])) != nil {
+            // `git diff --cached --quiet` exits non-zero only when something is staged.
+            // Nothing staged is a genuine no-op; any *other* commit failure (hook,
+            // signing, locked index) must propagate rather than be mistaken for the
+            // no-op and reported downstream as a successful delivery on a stale branch.
+            let hasStagedChanges = try git.capture(["diff", "--cached", "--quiet"]).status != 0
+            if hasStagedChanges {
+                try git.run(["commit", "-m", message])
                 try git.run(["push", "--force", "origin", branch])
             }
         } catch {

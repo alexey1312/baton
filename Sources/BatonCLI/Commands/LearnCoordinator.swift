@@ -44,7 +44,9 @@ enum LearnCoordinator {
 
         // Refused (out-of-allowlist) edits never persist, in preview or delivery.
         LearnGit.restore(result.proposals.flatMap(\.droppedPaths), repoRoot: options.repoRoot)
-        cacheSignal(result, repoRoot: options.repoRoot)
+        if let cacheWarning = cacheSignal(result, repoRoot: options.repoRoot) {
+            TerminalOutput.shared.err(NooraUI.warning(cacheWarning, useColors: colors))
+        }
 
         let deliver = options.apply || deliveryConfigured(discovery)
         if deliver {
@@ -113,11 +115,19 @@ enum LearnCoordinator {
 
     // MARK: - Helpers
 
-    private static func cacheSignal(_ result: LearnRunResult, repoRoot: URL) {
-        guard !result.allCandidates.isEmpty else { return }
+    /// Best-effort write to the non-authoritative feedback cache. Returns a warning
+    /// when the write fails so a broken cache is visible — swallowing the error
+    /// would leave `baton stats` silently stale with no explanation.
+    private static func cacheSignal(_ result: LearnRunResult, repoRoot: URL) -> String? {
+        guard !result.allCandidates.isEmpty else { return nil }
         let identity = RepoIdentity.resolve(repoRoot: repoRoot)
-        guard let db = try? BatonDatabase.open(at: DatabasePathResolver.globalDatabaseURL) else { return }
-        try? FeedbackRepository(connection: db.connection).upsertAll(result.allCandidates, repoId: identity.id)
+        do {
+            let db = try BatonDatabase.open(at: DatabasePathResolver.globalDatabaseURL)
+            try FeedbackRepository(connection: db.connection).upsertAll(result.allCandidates, repoId: identity.id)
+            return nil
+        } catch {
+            return "Feedback cache not updated (\(error)); `baton stats` trends may be stale."
+        }
     }
 
     private static func deliveryConfigured(_ discovery: DiscoveryResult) -> Bool {

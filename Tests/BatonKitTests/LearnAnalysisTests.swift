@@ -165,4 +165,22 @@ struct LearnAnalysisTests {
         let kept = allow.filter(edits)
         #expect(kept.map(\.path) == ["baton.toml", ".baton/skills/sec/SKILL.md"])
     }
+
+    @Test("root scope still refuses source, manifests, and CI despite owning all paths")
+    func allowlistRootScopeRefusesSource() {
+        let allow = EditAllowlist(scopePath: "", localSkillDirs: [".baton/skills"])
+        #expect(allow.isAllowed("baton.toml"))
+        #expect(allow.isAllowed("CLAUDE.md"))
+        #expect(allow.isAllowed(".baton/skills/sec/SKILL.md"))
+        #expect(!allow.isAllowed("Sources/App.swift"))
+        #expect(!allow.isAllowed("Package.swift"))
+        #expect(!allow.isAllowed(".github/workflows/ci.yml"))
+    }
+
+    @Test("`..` traversal is refused even toward an allowed skill dir")
+    func allowlistRejectsTraversal() {
+        let allow = EditAllowlist(scopePath: "ios", localSkillDirs: ["ios/.baton/skills"])
+        #expect(!allow.isAllowed("ios/.baton/skills/../../Sources/App.swift"))
+        #expect(!allow.isAllowed("ios/../web/baton.toml"))
+    }
 }

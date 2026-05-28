@@ -1,6 +1,7 @@
 /// Stable, machine-recognizable markers Baton embeds in PR content.
 public enum BatonMarker {
-    /// Footer marker on every Baton-authored finding comment (dedupe + future `learn`).
+    /// Footer marker on every Baton-authored finding comment (dedupe + the `learn`
+    /// usefulness signal, which recovers a finding's identity from this marker).
     public static let finding = "<!-- baton:finding -->"
 
     /// The reviewed-head-SHA marker embedded in the Baton PR-review body.

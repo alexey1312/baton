@@ -19,13 +19,17 @@ enum LearnPlanning {
     }
 
     /// Repo-relative directories the scope may edit: its own `.baton/skills` plus
-    /// any local `[[skills]]` source directory.
-    private static func localSkillDirs(scope: ScopeConfig, effective: EffectiveConfig) -> [String] {
+    /// any local `[[skills]]` source directory. Absolute, `~`, and `..`-traversing
+    /// sources are rejected so the allowlist only ever widens within the repo.
+    static func localSkillDirs(scope: ScopeConfig, effective: EffectiveConfig) -> [String] {
         var dirs = [join(scope.path, ".baton/skills")]
         for skill in effective.skills {
             guard case let .local(path) = SkillSource.classify(skill.source) else { continue }
-            guard !path.hasPrefix("/"), !path.hasPrefix("~") else { continue } // only repo-relative
-            dirs.append(join(scope.path, strip(path)))
+            let clean = strip(path)
+            guard !path.hasPrefix("/"), !path.hasPrefix("~"), !clean.split(separator: "/").contains("..") else {
+                continue
+            }
+            dirs.append(join(scope.path, clean))
         }
         return Array(Set(dirs))
     }

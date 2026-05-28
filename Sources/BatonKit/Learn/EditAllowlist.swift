@@ -39,6 +39,10 @@ public struct EditAllowlist: Sendable {
     /// Whether `path` (repo-relative) is an allowed review-setup edit for the scope.
     public func isAllowed(_ path: String) -> Bool {
         let clean = Self.normalize(path)
+        // Fail closed on `..`: a traversal segment could escape the scope (e.g.
+        // `ios/.baton/skills/../../Sources/App.swift`) and slip a source edit past
+        // the prefix checks. `normalize` does not collapse `..`, so reject it here.
+        guard !Self.hasTraversal(clean) else { return false }
         guard withinScope(clean) else { return false }
         if Self.lastComponent(clean) == "baton.toml" { return true }
         if Self.agentDocNames.contains(Self.lastComponent(clean)) { return true }
@@ -69,8 +73,14 @@ public struct EditAllowlist: Sendable {
         String(path.split(separator: "/").last ?? "")
     }
 
-    /// Normalize a path: trim a leading `./`, collapse redundant slashes, strip a
-    /// trailing slash. Keeps comparisons stable across how sources are declared.
+    /// Whether any path component is an upward-traversal `..` segment.
+    private static func hasTraversal(_ path: String) -> Bool {
+        path.split(separator: "/").contains("..")
+    }
+
+    /// Normalize a path: trim a leading `./` or `/` and a trailing `/`, keeping
+    /// comparisons stable across how sources are declared. Does not collapse `..`
+    /// segments — those are rejected by ``hasTraversal``.
     private static func normalize(_ path: String) -> String {
         var result = path
         while result.hasPrefix("./") {

@@ -52,7 +52,7 @@ public struct GitHubLearnForge: LearnSignalSource {
         let cutoff = now().addingTimeInterval(-Double(lookbackDays) * 86400)
         let path = "/repos/\(repo)/pulls?state=closed&sort=updated&direction=desc&per_page=100"
         let result = try await api(method: "GET", path: path, paginate: true)
-        let closed = LearnAPIBodies.decode([LearnAPIBodies.ClosedPR].self, from: result.stdout) ?? []
+        let closed = try LearnAPIBodies.decode([LearnAPIBodies.ClosedPR].self, from: result.stdout)
         return closed.compactMap { pr in
             guard let merged = pr.mergedAt, merged >= cutoff else { return nil }
             return MergedPullRequest(number: pr.number, author: pr.user?.login ?? "", mergedAt: merged)
@@ -66,10 +66,15 @@ public struct GitHubLearnForge: LearnSignalSource {
             owner: owner, name: name, number: pullRequest.number
         ))
         let result = try await graphql(body)
-        guard let decoded = LearnAPIBodies.decode(LearnAPIBodies.ThreadsResponse.self, from: result.stdout) else {
-            return []
+        let decoded = try LearnAPIBodies.decode(LearnAPIBodies.ThreadsResponse.self, from: result.stdout)
+        if let errors = decoded.errors, !errors.isEmpty {
+            throw ForgeError.publishFailed(
+                detail: "GitHub GraphQL error: " + errors.map(\.message).joined(separator: "; ")
+            )
         }
-        let pr = decoded.data.repository.pullRequest
+        guard let pr = decoded.data?.repository?.pullRequest else {
+            throw ForgeError.publishFailed(detail: "GitHub GraphQL response omitted the pull request payload")
+        }
         let prAuthor = pr.author?.login ?? pullRequest.author
 
         var signals: [ReviewThreadSignal] = []
@@ -117,7 +122,7 @@ public struct GitHubLearnForge: LearnSignalSource {
     private func fetchReactions(commentId: Int) async throws -> [Reaction] {
         let path = "/repos/\(repo)/pulls/comments/\(commentId)/reactions"
         let result = try await api(method: "GET", path: path, paginate: true)
-        let raw = LearnAPIBodies.decode([LearnAPIBodies.ReactionResponse].self, from: result.stdout) ?? []
+        let raw = try LearnAPIBodies.decode([LearnAPIBodies.ReactionResponse].self, from: result.stdout)
         return raw.compactMap { reaction in
             let kind: ReactionKind? = switch reaction.content {
             case "+1": .thumbsUp

@@ -49,10 +49,15 @@ enum LearnAPIBodies {
     // MARK: - GraphQL response decoding
 
     struct ThreadsResponse: Decodable {
-        let data: DataField
+        // GitHub returns query-level failures as HTTP 200 with a populated `errors`
+        // array and null `data`, so both must be modeled to tell a real failure
+        // apart from a pull request that genuinely has no review threads.
+        let data: DataField?
+        let errors: [GraphQLError]?
 
-        struct DataField: Decodable { let repository: Repository }
-        struct Repository: Decodable { let pullRequest: PullRequest }
+        struct GraphQLError: Decodable { let message: String }
+        struct DataField: Decodable { let repository: Repository? }
+        struct Repository: Decodable { let pullRequest: PullRequest? }
         struct PullRequest: Decodable {
             let author: Actor?
             let reviewThreads: ThreadConnection
@@ -132,8 +137,18 @@ enum LearnAPIBodies {
         return String(bytes: data, encoding: .utf8) ?? ""
     }
 
-    static func decode<T: Decodable>(_ type: T.Type, from stdout: String) -> T? {
-        guard let data = stdout.data(using: .utf8) else { return nil }
-        return try? JSONCodec.decodeWithISO8601Date(type, from: data)
+    /// Decode a `gh` JSON response, raising ``ForgeError`` when the payload cannot
+    /// be parsed. `gh` exiting 0 does not guarantee a well-formed body (e.g. a
+    /// truncated response or a drifted schema), so a parse failure must surface
+    /// rather than be silently treated as "no data".
+    static func decode<T: Decodable>(_ type: T.Type, from stdout: String) throws -> T {
+        guard let data = stdout.data(using: .utf8) else {
+            throw ForgeError.publishFailed(detail: "gh returned non-UTF-8 output")
+        }
+        do {
+            return try JSONCodec.decodeWithISO8601Date(type, from: data)
+        } catch {
+            throw ForgeError.publishFailed(detail: "could not parse the gh JSON response: \(error)")
+        }
     }
 }

@@ -101,6 +101,38 @@ struct LearnForgeTests {
         #expect(human.finding == nil)
     }
 
+    @Test("a configured automation actor's resolution is excluded as non-human signal")
+    func automationActorExcluded() async throws {
+        let body = "**🔴 high — X**\\n\\n\(BatonMarker.finding)"
+        let json = """
+        {"data":{"repository":{"pullRequest":{
+          "author":{"login":"author"},
+          "reviewThreads":{"nodes":[
+            {"id":"T1","isResolved":true,"isOutdated":false,"resolvedBy":{"login":"svc-account"},
+             "comments":{"nodes":[{"databaseId":1,"body":"\(body)","path":"ios/A.swift","line":1}]}}
+          ]}
+        }}}}
+        """
+        let gh = MockGH { args, _ in
+            contains(args, "graphql") ? ok(json) : ok("[]")
+        }
+        let forge = GitHubLearnForge(gh: gh, repo: "o/r", options: .init(automationActors: ["svc-account"]))
+        let pr = MergedPullRequest(number: 1, author: "author", mergedAt: Date())
+        let signal = try #require(try await forge.threadSignals(for: pr).first)
+        #expect(signal.resolvedByAutomation) // svc-account, though not a `[bot]`
+    }
+
+    @Test("a GraphQL query-level error fails hard instead of yielding empty signal")
+    func graphQLErrorFailsHard() async throws {
+        let errorBody = #"{"data":null,"errors":[{"message":"Could not resolve to a Repository"}]}"#
+        let gh = MockGH { _, _ in ok(errorBody) } // HTTP 200 with errors
+        let forge = GitHubLearnForge(gh: gh, repo: "o/r")
+        let pr = MergedPullRequest(number: 1, author: "a", mergedAt: Date())
+        await #expect(throws: ForgeError.self) {
+            try await forge.threadSignals(for: pr)
+        }
+    }
+
     // MARK: - Delivery
 
     @Test("delivery opens a draft PR when none exists")
@@ -135,6 +167,21 @@ struct LearnForgeTests {
         #expect(report.degradedToPreview)
         #expect(!report.created)
         #expect(report.warnings.contains { $0.contains("cannot open or update") })
+    }
+
+    @Test("a 422 validation error fails hard rather than degrading to preview")
+    func validationErrorFailsHard() async throws {
+        let gh = MockGH { args, _ in
+            if contains(args, "state=open") { return ok("[]") }
+            return GHResult(
+                status: 1,
+                stdout: "",
+                stderr: "HTTP 422: Validation Failed: No commits between main and learn"
+            )
+        }
+        await #expect(throws: ForgeError.self) {
+            try await GitHubLearnDelivery(gh: gh).deliver(request())
+        }
     }
 
     private func request() -> LearnDeliveryRequest {

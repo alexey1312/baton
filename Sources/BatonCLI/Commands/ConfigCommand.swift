@@ -86,6 +86,18 @@ struct ConfigCommand: AsyncParsableCommand {
         lines.append("  branch = \(learn.branch)\(provenance("learn.branch", config))")
         if let base = learn.base { lines.append("  base = \(base)\(provenance("learn.base", config))") }
         lines.append("  draft = \(learn.draft)\(provenance("learn.draft", config))")
+        if !learn.reviewers.isEmpty {
+            let value = learn.reviewers.joined(separator: ", ")
+            lines.append("  reviewers = \(value)\(provenance("learn.reviewers", config))")
+        }
+        if !learn.teamReviewers.isEmpty {
+            let value = learn.teamReviewers.joined(separator: ", ")
+            lines.append("  team_reviewers = \(value)\(provenance("learn.team_reviewers", config))")
+        }
+        if !learn.labels.isEmpty {
+            let value = learn.labels.joined(separator: ", ")
+            lines.append("  labels = \(value)\(provenance("learn.labels", config))")
+        }
         return lines
     }
 
