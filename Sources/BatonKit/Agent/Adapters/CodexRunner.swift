@@ -8,7 +8,7 @@ public struct CodexRunner: AgentRunner {
 
     public func parse(_ output: AgentOutput) throws -> ParsedFindings {
         var parsed = try FindingsParser.parse(output.stdout)
-        parsed.usage = UsageExtractor.extract(stdout: output.stdout, model: nil)
+        parsed.usage = UsageExtractor.extract(stdout: output.stdout, model: output.model)
         return parsed
     }
 }

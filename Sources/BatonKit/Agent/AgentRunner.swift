@@ -1,15 +1,19 @@
 import Foundation
 
-/// The raw output captured from an agent process.
+/// The raw output captured from an agent process plus the model that was
+/// invoked. `model` carries the resolved model id so adapters can pass it to
+/// ``UsageExtractor`` for price-table fallback when the envelope omits cost.
 public struct AgentOutput: Sendable {
     public var stdout: String
     public var stderr: String
     public var exitStatus: Int32
+    public var model: String?
 
-    public init(stdout: String, stderr: String, exitStatus: Int32) {
+    public init(stdout: String, stderr: String, exitStatus: Int32, model: String? = nil) {
         self.stdout = stdout
         self.stderr = stderr
         self.exitStatus = exitStatus
+        self.model = model
     }
 }
 

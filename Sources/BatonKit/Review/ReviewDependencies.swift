@@ -64,6 +64,6 @@ public struct LiveReviewAgent: ReviewAgentRunning {
             prompt: request.prompt,
             workdir: workspace
         )
-        return try await invoker.run(runner: runner, invocation: invocation)
+        return try await invoker.run(runner: runner, invocation: invocation, model: request.model)
     }
 }

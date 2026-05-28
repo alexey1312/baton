@@ -51,30 +51,39 @@ public struct ClaudeRunner: AgentRunner {
 
         let inner = envelope.result ?? output.stdout
         var parsed = try FindingsParser.parse(inner)
-        parsed.usage = Self.makeUsage(from: envelope)
+        parsed.usage = Self.makeUsage(from: envelope, model: output.model)
         return parsed
     }
 
     /// Convert Claude's envelope into an ``AgentUsage``. Cache token counts
-    /// are folded into `inputTokens` because they bill at input rates.
-    private static func makeUsage(from envelope: Envelope) -> AgentUsage? {
+    /// are folded into `inputTokens` because they bill at input rates. If the
+    /// envelope omits cost but we have tokens and a known model, fall back to
+    /// the price table.
+    private static func makeUsage(from envelope: Envelope, model: String?) -> AgentUsage? {
         let usage = envelope.usage
-        let cost = envelope.total_cost_usd
+        var cost = envelope.total_cost_usd
         let input = sum(usage?.input_tokens, usage?.cache_creation_input_tokens, usage?.cache_read_input_tokens)
         let output = usage?.output_tokens
         if input == nil, output == nil, cost == nil {
             return nil
         }
+        var source: AgentUsage.Source = .agentEnvelope
+        if cost == nil {
+            if let estimated = Pricing.estimateCost(model: model, inputTokens: input, outputTokens: output) {
+                cost = estimated
+                source = .priceTable
+            }
+        }
         return AgentUsage(
             inputTokens: input,
             outputTokens: output,
             totalCostUSD: cost,
-            source: .agentEnvelope
+            source: source
         )
     }
 
     private static func sum(_ values: Int?...) -> Int? {
-        let present = values.compactMap { $0 }
+        let present = values.compactMap(\.self)
         return present.isEmpty ? nil : present.reduce(0, +)
     }
 }

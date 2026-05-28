@@ -32,7 +32,11 @@ public struct AgentInvoker: Sendable {
         self.executor = executor
     }
 
-    public func run(runner: any AgentRunner, invocation: ProcessInvocation) async throws -> AgentRunOutcome {
+    public func run(
+        runner: any AgentRunner,
+        invocation: ProcessInvocation,
+        model: String? = nil
+    ) async throws -> AgentRunOutcome {
         let agent = runner.kind.rawValue
         let result = try await executor.run(invocation, agentName: agent)
 
@@ -45,7 +49,9 @@ public struct AgentInvoker: Sendable {
             throw AgentError.emptyOutput(agent: agent, stderrTail: result.stderrTail())
         }
 
-        let output = AgentOutput(stdout: result.stdoutText, stderr: result.stderr, exitStatus: result.status)
+        let output = AgentOutput(
+            stdout: result.stdoutText, stderr: result.stderr, exitStatus: result.status, model: model
+        )
         do {
             let parsed = try runner.parse(output)
             return AgentRunOutcome(
