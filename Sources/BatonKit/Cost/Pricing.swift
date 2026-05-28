@@ -87,10 +87,11 @@ public enum UsageExtractor {
     }
 
     /// Decode any of the common usage shapes. Returns nil when nothing matches.
+    /// Agent stdout is free-form so failure to parse is normal — we treat any
+    /// decode error as "no usage signal" and return nil.
     private static func parseEnvelope(_ stdout: String) -> AgentUsage? {
-        guard let data = stdout.data(using: .utf8) else { return nil }
-        let decoder = JSONDecoder()
-        if let envelope = try? decoder.decode(LooseEnvelope.self, from: data),
+        let data = Data(stdout.utf8)
+        if let envelope = try? JSONCodec.decode(LooseEnvelope.self, from: data),
            let usage = envelope.toUsage()
         {
             return usage
