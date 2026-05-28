@@ -66,7 +66,13 @@ extension SkillResolver {
         // `.vscode`, ...). Only non-hidden directories that still don't belong in a
         // skill bundle need an explicit entry here.
         let skipDirs: Set = ["node_modules"]
-        let bodyPath = bodyURL.standardizedFileURL.path
+        // Both body candidates are alternate bodies, never references: when SKILL.md is
+        // the body, a sibling README.md must not be inlined as a `## Reference:` block.
+        let skipPaths = Set([
+            bodyURL.standardizedFileURL.path,
+            skillDir.appendingPathComponent("SKILL.md").standardizedFileURL.path,
+            skillDir.appendingPathComponent("README.md").standardizedFileURL.path,
+        ])
         let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey]
         guard let enumerator = fileManager.enumerator(
             at: skillDir,
@@ -85,12 +91,14 @@ extension SkillResolver {
                 }
                 continue
             }
-            guard values.isRegularFile == true,
-                  url.pathExtension.lowercased() == "md"
-            else { continue }
+            guard url.pathExtension.lowercased() == "md" else { continue }
             let standardized = url.standardizedFileURL
-            if standardized.path == bodyPath { continue }
+            if skipPaths.contains(standardized.path) { continue }
+            // Run the escape check before the regular-file guard: a symlink reports
+            // isRegularFile == false, so a `.md` symlink pointing outside the skill
+            // directory must be rejected here rather than silently skipped.
             try assertNoSymlinkEscape(standardized, within: skillDir, skillName: skillName)
+            guard values.isRegularFile == true else { continue }
             let content = try readReference(standardized, skillName: skillName)
             totalBytes += content.utf8.count
             if totalBytes > Self.referencesBudgetBytes {
