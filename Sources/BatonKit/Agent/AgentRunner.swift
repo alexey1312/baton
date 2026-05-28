@@ -28,6 +28,11 @@ public protocol AgentRunner: Sendable {
     var defaultBinary: String { get }
     /// Headless/non-interactive flags for this CLI.
     var baseArguments: [String] { get }
+    /// Extra flags that make this CLI run hermetically — ignoring the user's
+    /// global MCP servers, extensions, and plugins (so no ambient tools load and
+    /// no interactive auth prompts fire). Appended only when sandbox is enabled.
+    /// Empty by default; each adapter supplies its CLI's flags.
+    var sandboxArguments: [String] { get }
     /// How the prompt is delivered (stdin by default).
     var promptDelivery: PromptDelivery { get }
     /// Map the resolved model to this CLI's model flag (empty when unset).
@@ -39,6 +44,10 @@ public protocol AgentRunner: Sendable {
 public extension AgentRunner {
     var promptDelivery: PromptDelivery {
         .stdin
+    }
+
+    var sandboxArguments: [String] {
+        []
     }
 
     func modelArguments(_ model: String?) -> [String] {

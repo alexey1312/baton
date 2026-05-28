@@ -3,6 +3,8 @@ public struct OpencodeRunner: AgentRunner {
     public let kind: AgentKind = .opencode
     public let defaultBinary = "opencode"
     public let baseArguments = ["run"]
+    /// `--pure` runs opencode without external plugins.
+    public let sandboxArguments = ["--pure"]
 
     public init() {}
 

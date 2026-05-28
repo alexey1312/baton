@@ -45,6 +45,7 @@ struct ConfigCommand: AsyncParsableCommand {
             lines.append("  kind = \(agent.kind.rawValue)")
             if let model = agent.model { lines.append("  model = \(model)") }
             lines.append("  context = \((agent.context ?? .diff).rawValue)")
+            lines.append("  sandbox = \(agent.sandbox ?? ConfigDefaults.sandbox)")
         }
 
         lines.append("[defaults]")

@@ -33,6 +33,39 @@ struct AgentInvocationTests {
         }
     }
 
+    @Test("sandbox is on by default and appends each CLI's hermetic flags after base args")
+    func sandboxDefaultOn() {
+        let expected: [AgentKind: [String]] = [
+            .claude: ["--strict-mcp-config"],
+            .codex: ["--ignore-user-config"],
+            .gemini: ["--allowed-mcp-server-names", "baton-sandbox-no-mcp"],
+            .opencode: ["--pure"],
+        ]
+        for (kind, flags) in expected {
+            let runner = AgentRegistry.runner(for: kind)
+            let inv = InvocationBuilder.make(
+                runner: runner, agent: AgentConfig(kind: kind),
+                defaults: defaults, model: nil, prompt: "P", workdir: workdir
+            )
+            #expect(inv.arguments.starts(with: runner.baseArguments + flags))
+        }
+    }
+
+    @Test("sandbox = false omits the hermetic flags")
+    func sandboxDisabled() {
+        for kind in AgentKind.builtIn {
+            let runner = AgentRegistry.runner(for: kind)
+            let inv = InvocationBuilder.make(
+                runner: runner, agent: AgentConfig(kind: kind, sandbox: false),
+                defaults: defaults, model: nil, prompt: "P", workdir: workdir
+            )
+            for flag in runner.sandboxArguments {
+                #expect(!inv.arguments.contains(flag))
+            }
+            #expect(inv.arguments == runner.baseArguments)
+        }
+    }
+
     @Test("model flag maps and strips a provider/ prefix")
     func modelMapping() {
         let inv = InvocationBuilder.make(

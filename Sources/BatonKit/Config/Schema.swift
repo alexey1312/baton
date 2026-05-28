@@ -55,19 +55,24 @@ public struct AgentConfig: Codable, Equatable, Sendable {
     public var binary: String?
     public var args: [String]?
     public var context: ReviewContext?
+    /// Run the CLI hermetically (ignore the user's global MCP/extensions/plugins).
+    /// Defaults to ``ConfigDefaults/sandbox`` when unset.
+    public var sandbox: Bool?
 
     public init(
         kind: AgentKind,
         model: String? = nil,
         binary: String? = nil,
         args: [String]? = nil,
-        context: ReviewContext? = nil
+        context: ReviewContext? = nil,
+        sandbox: Bool? = nil
     ) {
         self.kind = kind
         self.model = model
         self.binary = binary
         self.args = args
         self.context = context
+        self.sandbox = sandbox
     }
 }
 

@@ -24,6 +24,10 @@ public struct ClaudeRunner: AgentRunner {
         "--max-turns", "1",
         "--dangerously-skip-permissions",
     ]
+    /// `--strict-mcp-config` ignores every MCP source except an explicit
+    /// `--mcp-config` (which Baton never passes), so no global MCP server loads
+    /// or prompts for auth.
+    public let sandboxArguments = ["--strict-mcp-config"]
 
     public init() {}
 

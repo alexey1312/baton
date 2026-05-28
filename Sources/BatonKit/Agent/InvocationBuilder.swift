@@ -14,6 +14,9 @@ public enum InvocationBuilder {
         environment: [String: String] = [:]
     ) -> ProcessInvocation {
         var arguments = runner.baseArguments
+        if agent.sandbox ?? ConfigDefaults.sandbox {
+            arguments += runner.sandboxArguments
+        }
         arguments += runner.modelArguments(model)
         arguments += agent.args ?? []
         if runner.promptDelivery == .argument {

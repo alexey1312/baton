@@ -22,11 +22,20 @@ model   = "claude-opus-4-7"   # optional; mapped to the CLI's model flag
 binary  = "/opt/homebrew/bin/claude"  # optional override — honored for every agent
 args    = ["--verbose"]       # optional extra args — honored for every agent
 context = "diff"              # diff (default) | repo
+sandbox = true               # hermetic run, ignoring the user's global MCP/extensions (default true)
 ```
 
 `kind = "custom"` drives any other CLI; it requires `binary`. With `context = "repo"` a
 read-only copy of the repository is placed in the agent's working directory for cross-file
 reasoning; `diff` (the default) sends only the scope's slice of the diff.
+
+`sandbox = true` (the default) runs the CLI hermetically so a review never inherits the
+user's ambient tools or triggers their interactive auth prompts: `claude` adds
+`--strict-mcp-config`, `codex` adds `--ignore-user-config`, `gemini` restricts its MCP
+allowlist to a sentinel name, and `opencode` adds `--pure`. Baton's own skills are inlined
+into the prompt, so they are unaffected. Set `sandbox = false` to restore the CLI's full
+configuration (e.g. when a review genuinely needs a global MCP server). `custom` agents get
+no sandbox flags — control them via `args`.
 
 ### [defaults]
 

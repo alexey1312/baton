@@ -14,6 +14,11 @@ public enum ConfigDefaults {
     public static let timeout = 600
     /// Agent material context.
     public static let context: ReviewContext = .diff
+    /// Whether the agent CLI runs hermetically — ignoring the user's global MCP
+    /// servers, extensions, and plugins so a review never inherits ambient tools
+    /// or triggers their interactive auth prompts. Baton's own skills are inlined
+    /// into the prompt, so they are unaffected.
+    public static let sandbox = true
     /// Whether remote skills must be SHA-pinned.
     public static let requirePinnedSkills = true
     /// Per-skill byte budget for inlined supporting markdown (1 MiB) when
