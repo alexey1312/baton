@@ -95,33 +95,13 @@ jobs:
       - name: Test
         run: mise run test
 
-  build-windows:
-    name: Build (Windows, best-effort)
-    runs-on: windows-latest
-    needs: lint
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Swift
-        uses: compnerd/gha-setup-swift@v0.4.0
-        with:
-          swift-version: swift-6.3-release
-          swift-build: 6.3-RELEASE
-
-      - name: Cache SPM dependencies
-        uses: actions/cache@v5
-        with:
-          path: .build
-          key: ${{ runner.os }}-swift-6.3-spm-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-swift-6.3-spm-
-
-      - name: Show Swift version
-        run: swift --version
-
-      - name: Build
-        run: swift build
-
-      - name: Test
-        run: swift test
+# TODO(windows): Re-add the Windows build job once the package compiles on Windows.
+# Blocked by stephencelis/SQLite.swift, a `BatonKit` dependency: it does `import
+# SQLite3`, which resolves against a system `SQLite3` module present in the macOS and
+# Linux Swift toolchains but NOT shipped with the Windows toolchain, so the build
+# fails with `error: no such module 'SQLite3'`. SQLite.swift 0.16.0 fixed Linux
+# compilation but did not add Windows support. The job was `continue-on-error: true`
+# (best-effort) and had been red for this reason, adding noise without signal.
+# Options to unblock: vendor a C SQLite as a C target (no feature loss), or gate the
+# Database module behind `#if !os(Windows)` (drops stats/history/show + learn cache
+# on Windows). Until then, Windows is unsupported in CI.
