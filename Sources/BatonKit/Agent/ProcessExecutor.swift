@@ -16,21 +16,27 @@ public struct ProcessExecutor: Sendable {
     /// Run `invocation`, returning the captured result. Throws `AgentError.timedOut`
     /// when the timeout elapses before the process exits.
     ///
-    /// Completion is driven by the process's `terminationHandler` (Foundation's own
-    /// `waitpid` monitor), not a blocking `waitUntilExit()` on a GCD worker — so a
-    /// parallel fan-out of runs cannot starve the global pool. The timeout
-    /// terminator likewise runs on a dedicated OS thread, never the pool.
+    /// The blocking work runs on a dedicated OS thread, not `DispatchQueue.global()`:
+    /// `waitUntilExit()` blocks its thread, and a parallel fan-out on the shared GCD
+    /// pool would starve both that wait and the timeout terminator. A real thread is
+    /// independent of the pool. (`terminationHandler` would avoid blocking entirely
+    /// but is unreliable on swift-corelibs-foundation/Linux, so we keep the portable
+    /// `waitUntilExit()`.)
     public func run(_ invocation: ProcessInvocation, agentName: String) async throws -> ProcessResult {
         try await withCheckedThrowingContinuation { continuation in
-            Self.launch(invocation, agentName: agentName, continuation: continuation)
+            let thread = Thread {
+                do {
+                    try continuation.resume(returning: Self.runBlocking(invocation, agentName: agentName))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+            thread.stackSize = 1 << 20
+            thread.start()
         }
     }
 
-    private static func launch(
-        _ invocation: ProcessInvocation,
-        agentName: String,
-        continuation: CheckedContinuation<ProcessResult, Error>
-    ) {
+    private static func runBlocking(_ invocation: ProcessInvocation, agentName: String) throws -> ProcessResult {
         let process = Process()
         ProcessLauncher.configure(process, executable: invocation.executable, arguments: invocation.arguments)
         process.currentDirectoryURL = invocation.workingDirectory
@@ -50,41 +56,16 @@ public struct ProcessExecutor: Sendable {
         outPipe.fileHandleForReading.readabilityHandler = { buffers.appendOut($0.availableData) }
         errPipe.fileHandleForReading.readabilityHandler = { buffers.appendErr($0.availableData) }
 
+        // Termination handler is installed before run() (ExFig pattern).
+        process.terminationHandler = { _ in }
+
         let timedOut = TimeoutFlag()
-        let resume = ResumeOnce()
         let exited = DispatchSemaphore(value: 0)
         let start = Date()
-
-        process.terminationHandler = { proc in
-            exited.signal() // wake the terminator so it neither kills nor lingers
-            outPipe.fileHandleForReading.readabilityHandler = nil
-            errPipe.fileHandleForReading.readabilityHandler = nil
-            buffers.appendOut(outPipe.fileHandleForReading.readDataToEndOfFile())
-            buffers.appendErr(errPipe.fileHandleForReading.readDataToEndOfFile())
-            guard resume.tryResume() else { return }
-            if timedOut.isSet {
-                continuation.resume(throwing: AgentError.timedOut(agent: agentName, seconds: invocation.timeout))
-            } else {
-                continuation.resume(returning: ProcessResult(
-                    status: proc.terminationStatus,
-                    stdout: buffers.outData,
-                    stderr: buffers.errString,
-                    duration: Date().timeIntervalSince(start)
-                ))
-            }
-        }
-
         do {
             try process.run()
         } catch {
-            exited.signal()
-            if resume.tryResume() {
-                continuation.resume(throwing: AgentError.binaryNotFound(
-                    agent: agentName,
-                    binary: invocation.executable
-                ))
-            }
-            return
+            throw AgentError.binaryNotFound(agent: agentName, binary: invocation.executable)
         }
 
         if let stdin = invocation.stdin, let inPipe {
@@ -92,7 +73,26 @@ public struct ProcessExecutor: Sendable {
             try? inPipe.fileHandleForWriting.close()
         }
 
+        // Arm the terminator before blocking, then release it once the child exits.
         armTimeout(process, seconds: invocation.timeout, flag: timedOut, exited: exited)
+        process.waitUntilExit()
+        exited.signal()
+
+        outPipe.fileHandleForReading.readabilityHandler = nil
+        errPipe.fileHandleForReading.readabilityHandler = nil
+        buffers.appendOut(outPipe.fileHandleForReading.readDataToEndOfFile())
+        buffers.appendErr(errPipe.fileHandleForReading.readDataToEndOfFile())
+
+        if timedOut.isSet {
+            throw AgentError.timedOut(agent: agentName, seconds: invocation.timeout)
+        }
+
+        return ProcessResult(
+            status: process.terminationStatus,
+            stdout: buffers.outData,
+            stderr: buffers.errString,
+            duration: Date().timeIntervalSince(start)
+        )
     }
 
     /// Arm a one-shot terminator on a dedicated OS thread: it waits on `exited` until
@@ -159,19 +159,5 @@ private final class TimeoutFlag: @unchecked Sendable {
     var isSet: Bool {
         lock.lock(); defer { lock.unlock() }
         return value
-    }
-}
-
-/// Guards a `CheckedContinuation` against a double resume: the termination handler
-/// and the launch-failure path both try to resume, but exactly one must win.
-private final class ResumeOnce: @unchecked Sendable {
-    private let lock = NSLock()
-    private var resumed = false
-
-    func tryResume() -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        if resumed { return false }
-        resumed = true
-        return true
     }
 }
