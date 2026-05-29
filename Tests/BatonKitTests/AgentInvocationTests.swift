@@ -100,6 +100,24 @@ struct AgentInvocationTests {
         #expect(!inv.arguments.contains("BIG PROMPT"))
     }
 
+    @Test("agent environment scrubs GitHub credentials but keeps provider keys and PATH")
+    func environmentScrub() {
+        let scrubbed = AgentEnvironment.scrubbed(from: [
+            "PATH": "/usr/bin",
+            "HOME": "/home/x",
+            "ANTHROPIC_API_KEY": "sk-keep",
+            "GITHUB_TOKEN": "ghp-drop",
+            "GH_TOKEN": "gho-drop",
+            "GH_ENTERPRISE_TOKEN": "ghe-drop",
+        ])
+        #expect(scrubbed["GITHUB_TOKEN"] == nil)
+        #expect(scrubbed["GH_TOKEN"] == nil)
+        #expect(scrubbed["GH_ENTERPRISE_TOKEN"] == nil)
+        #expect(scrubbed["ANTHROPIC_API_KEY"] == "sk-keep")
+        #expect(scrubbed["PATH"] == "/usr/bin")
+        #expect(scrubbed["HOME"] == "/home/x")
+    }
+
     @Test("every built-in agent has an adapter with a non-empty binary and base args")
     func registryComplete() {
         for kind in AgentKind.builtIn {

@@ -11,7 +11,7 @@ public enum InvocationBuilder {
         model: String?,
         prompt: String,
         workdir: URL,
-        environment: [String: String] = [:]
+        environment: [String: String] = AgentEnvironment.scrubbed()
     ) -> ProcessInvocation {
         var arguments = runner.baseArguments
         if agent.sandbox ?? ConfigDefaults.sandbox {
