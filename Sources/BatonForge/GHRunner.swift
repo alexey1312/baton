@@ -40,22 +40,6 @@ public extension GHRunning {
 public struct LiveGHRunner: GHRunning {
     public init() {}
 
-    /// Whether a `gh` executable is resolvable on `PATH`.
-    public static func isInstalled() -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["which", "gh"]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        do {
-            try process.run()
-        } catch {
-            return false
-        }
-        process.waitUntilExit()
-        return process.terminationStatus == 0
-    }
-
     public func run(_ args: [String], stdin: String?) async throws -> GHResult {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global().async {
