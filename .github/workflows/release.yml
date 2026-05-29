@@ -8,6 +8,9 @@ on:
 
 permissions:
   contents: write
+  # git-cliff's [remote.github] integration enriches notes with PR/author info; the
+  # PR list API needs pull-requests read or it 403s and git-cliff panics.
+  pull-requests: read
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
