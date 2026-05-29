@@ -1,21 +1,30 @@
 import BatonKit
 import Foundation
 
-/// Git side-effects for `learn`: restoring refused (out-of-allowlist) edits the
-/// agent wrongly produced, and committing the accepted edits onto the rolling
-/// `learn` branch for delivery.
+/// Git side-effects for `learn`: writing the accepted (allowlisted) edits to disk
+/// and committing them onto the rolling `learn` branch for delivery. The agent no
+/// longer edits files agentically (it returns structured JSON); Baton writes the
+/// allowlisted full-contents edits itself, so only the apply/delivery path touches
+/// the working tree — preview never does.
 enum LearnGit {
-    /// Revert the agent's changes to `paths` (refused edits). Tracked files are
-    /// restored from HEAD; untracked new files are removed. Best-effort.
-    static func restore(_ paths: [String], repoRoot: URL) {
-        guard !paths.isEmpty else { return }
-        let git = GitRunner(repoRoot: repoRoot)
-        let untracked = untrackedPaths(git)
-        for path in paths {
-            if untracked.contains(path) {
-                try? FileManager.default.removeItem(at: repoRoot.appendingPathComponent(path))
-            } else {
-                _ = try? git.run(["checkout", "--", path])
+    /// Write each allowed edit's full contents to `repoRoot/path`, creating parent
+    /// directories. A `nil`-contents edit (deletion) removes the file. Throws
+    /// ``CLIError`` on a write failure so a botched apply does not commit a stale
+    /// tree as if it succeeded.
+    static func writeEdits(_ edits: [ProposedEdit], repoRoot: URL) throws {
+        for edit in edits {
+            let url = repoRoot.appendingPathComponent(edit.path)
+            do {
+                guard let contents = edit.newContents else {
+                    try? FileManager.default.removeItem(at: url)
+                    continue
+                }
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try Data(contents.utf8).write(to: url)
+            } catch {
+                throw CLIError.learnDeliveryFailed(detail: "could not write \(edit.path): \(error)")
             }
         }
     }
@@ -46,18 +55,5 @@ enum LearnGit {
             throw CLIError.learnDeliveryFailed(detail: "\(error)")
         }
         _ = try? git.run(["switch", original])
-    }
-
-    private static func untrackedPaths(_ git: GitRunner) -> Set<String> {
-        // `-z` keeps non-ASCII names unquoted so the removeItem below matches the
-        // real file on disk (a C-quoted name would not, leaving a refused file).
-        let data = (try? git.capture(["status", "--porcelain", "-z", "--untracked-files=all"]))?.stdout ?? Data()
-        var result: Set<String> = []
-        for field in data.split(separator: 0x00, omittingEmptySubsequences: true) {
-            let entry = String(bytes: field, encoding: .utf8) ?? ""
-            guard entry.hasPrefix("??"), entry.count > 3 else { continue }
-            result.insert(String(entry.dropFirst(3)))
-        }
-        return result
     }
 }

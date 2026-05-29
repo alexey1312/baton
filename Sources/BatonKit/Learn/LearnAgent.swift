@@ -11,6 +11,9 @@ public struct LearnAgentRequest: Sendable {
     public var security: SecurityConfig?
     public var model: String?
     public var repoRoot: URL
+    /// Repo-relative local skill directories this scope may edit (allowlist). Used
+    /// to enumerate the editable files whose snapshot is offered to the agent.
+    public var localSkillDirs: [String]
     public var candidates: [RuleCandidate]
     public var bucketCounts: [ThreadBucket: Int]
     public var missingCoverage: [ReviewThreadSignal]
@@ -24,6 +27,7 @@ public struct LearnAgentRequest: Sendable {
         security: SecurityConfig?,
         model: String?,
         repoRoot: URL,
+        localSkillDirs: [String] = [],
         candidates: [RuleCandidate],
         bucketCounts: [ThreadBucket: Int],
         missingCoverage: [ReviewThreadSignal]
@@ -36,6 +40,7 @@ public struct LearnAgentRequest: Sendable {
         self.security = security
         self.model = model
         self.repoRoot = repoRoot
+        self.localSkillDirs = localSkillDirs
         self.candidates = candidates
         self.bucketCounts = bucketCounts
         self.missingCoverage = missingCoverage

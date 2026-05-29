@@ -47,8 +47,9 @@ enum LearnCoordinator {
         let engine = LearnEngine(agent: LiveLearnAgent(skills: resolver))
         let result = try await engine.run(plans: plans, signals: signals, repoRoot: options.repoRoot)
 
-        // Refused (out-of-allowlist) edits never persist, in preview or delivery.
-        LearnGit.restore(result.proposals.flatMap(\.droppedPaths), repoRoot: options.repoRoot)
+        // The agent returns proposed edits as structured data — nothing is written
+        // to the working tree until the apply/delivery path writes the allowlisted
+        // edits below, so preview stays read-only and refused paths never persist.
         if let cacheWarning = cacheSignal(result, repoRoot: options.repoRoot) {
             TerminalOutput.shared.err(NooraUI.warning(cacheWarning, useColors: colors))
         }
@@ -94,16 +95,20 @@ enum LearnCoordinator {
         options: Options
     ) async throws {
         let rootLearn = plans.first { $0.scope.path.isEmpty }?.effective.learn ?? EffectiveLearn()
-        let edits = result.proposals.flatMap { $0.edits.map(\.path) }
+        let allowedEdits = result.proposals.flatMap(\.edits)
+        let editPaths = allowedEdits.map(\.path)
         let colors = options.outputMode.useColors
 
-        guard !edits.isEmpty else {
+        guard !editPaths.isEmpty else {
             TerminalOutput.shared.out(NooraUI.success("Baton learn: no setup edits to deliver.", useColors: colors))
             return
         }
 
+        // Only the apply/delivery path writes to disk; the agent emitted structured
+        // edits, so Baton writes the allowlisted full contents here before staging.
+        try LearnGit.writeEdits(allowedEdits, repoRoot: options.repoRoot)
         try LearnGit.commitAndPush(
-            branch: rootLearn.branch, paths: edits,
+            branch: rootLearn.branch, paths: editPaths,
             message: "chore(baton): learn — review-setup proposals", repoRoot: options.repoRoot
         )
         let report = try await GitHubLearnDelivery().deliver(LearnDeliveryRequest(

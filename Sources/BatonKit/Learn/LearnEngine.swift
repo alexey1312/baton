@@ -181,6 +181,7 @@ public struct LearnEngine: Sendable {
             security: effective.security,
             model: agentConfig.model,
             repoRoot: repoRoot,
+            localSkillDirs: plan.localSkillDirs,
             candidates: candidates,
             bucketCounts: SignalAnalysis.bucketCounts(threads),
             missingCoverage: missingCoverage

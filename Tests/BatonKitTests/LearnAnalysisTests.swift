@@ -184,12 +184,92 @@ struct LearnAnalysisTests {
         #expect(!allow.isAllowed("ios/../web/baton.toml"))
     }
 
-    @Test("porcelain -z parsing keeps non-ASCII names unquoted and captures both rename paths")
-    func porcelainZParsing() {
-        // git status --porcelain -z: " M <path>", "?? <path>", and a rename as
-        // "R  <path1>" NUL "<path2>" — never C-quoted, so café.md stays intact.
-        let raw = " M café.md\u{0}?? new dir/a.txt\u{0}R  old.md\u{0}renamed.md\u{0}"
-        let paths = LiveLearnAgent.parsePorcelainZ(Data(raw.utf8))
-        #expect(paths == ["café.md", "new dir/a.txt", "old.md", "renamed.md"])
+    // MARK: - Proposal parsing
+
+    @Test("plain JSON proposal parses into themes and full-contents edits")
+    func proposalPlainJSON() throws {
+        let json = """
+        {"themes":[{"title":"Relax X","rationale":"too noisy","evidence":["https://e/1"]}],
+         "edits":[{"path":"ios/baton.toml","contents":"[[reviews]]\\nname=\\"x\\"\\n"}]}
+        """
+        let proposal = try LearnProposal.parse(json)
+        #expect(proposal.themes.map(\.title) == ["Relax X"])
+        #expect(proposal.themes.first?.evidence == ["https://e/1"])
+        let edits = proposal.proposedEdits
+        #expect(edits.map(\.path) == ["ios/baton.toml"])
+        #expect(edits.first?.newContents == "[[reviews]]\nname=\"x\"\n")
+    }
+
+    @Test("```json fenced proposal is tolerated")
+    func proposalFenced() throws {
+        let fenced = """
+        Here is my proposal:
+        ```json
+        {"themes":[],"edits":[{"path":"baton.toml","contents":"a=1"}]}
+        ```
+        """
+        let proposal = try LearnProposal.parse(fenced)
+        #expect(proposal.proposedEdits == [ProposedEdit(path: "baton.toml", newContents: "a=1")])
+    }
+
+    @Test("empty proposal parses to no edits")
+    func proposalEmpty() throws {
+        let proposal = try LearnProposal.parse("{\"themes\":[],\"edits\":[]}")
+        #expect(proposal.themes.isEmpty)
+        #expect(proposal.proposedEdits.isEmpty)
+    }
+
+    @Test("claude result envelope is unwrapped before parsing")
+    func envelopeUnwrap() throws {
+        let inner = "{\\\"themes\\\":[],\\\"edits\\\":[{\\\"path\\\":\\\"baton.toml\\\",\\\"contents\\\":\\\"x\\\"}]}"
+        let envelope = "{\"result\":\"\(inner)\",\"total_cost_usd\":0.01}"
+        let unwrapped = LiveLearnAgent.unwrapEnvelope(envelope)
+        let proposal = try LearnProposal.parse(unwrapped)
+        #expect(proposal.proposedEdits == [ProposedEdit(path: "baton.toml", newContents: "x")])
+    }
+
+    // MARK: - Prompt building
+
+    private func learnRequest(scopePath: String, repoRoot: URL, localSkillDirs: [String] = []) -> LearnAgentRequest {
+        LearnAgentRequest(
+            scopePath: scopePath, configDir: repoRoot, agent: AgentConfig(kind: .claude),
+            skills: [], defaults: EffectiveDefaults(), security: nil, model: nil,
+            repoRoot: repoRoot, localSkillDirs: localSkillDirs, candidates: [],
+            bucketCounts: [:], missingCoverage: []
+        )
+    }
+
+    @Test("prompt embeds the editable-file snapshot and demands a JSON-only proposal")
+    func promptSnapshotAndJSONInstruction() {
+        let request = learnRequest(scopePath: "ios", repoRoot: URL(fileURLWithPath: "/tmp/repo"))
+        let prompt = LearnPromptBuilder.build(
+            request, editableFiles: [(path: "ios/baton.toml", contents: "name = \"x\"")]
+        )
+        #expect(prompt.contains("ios/baton.toml"))
+        #expect(prompt.contains("name = \"x\"")) // snapshot contents inlined
+        #expect(prompt.contains("Output ONLY a single JSON object"))
+        #expect(prompt.contains("\"edits\":[{\"path\""))
+        #expect(prompt.contains("{\"themes\":[],\"edits\":[]}")) // empty-proposal contract
+        #expect(!prompt.lowercased().contains("edit the file using")) // no agentic tool language
+    }
+
+    @Test("editableFiles enumerates baton.toml, agent docs, and local skill files")
+    func editableFilesEnumeration() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("learn-editable-\(UUID().uuidString)", isDirectory: true)
+        let scope = root.appendingPathComponent("ios", isDirectory: true)
+        let skills = scope.appendingPathComponent(".baton/skills", isDirectory: true)
+        try FileManager.default.createDirectory(at: skills, withIntermediateDirectories: true)
+        try Data("toml".utf8).write(to: scope.appendingPathComponent("baton.toml"))
+        try Data("docs".utf8).write(to: scope.appendingPathComponent("CLAUDE.md"))
+        try Data("skill".utf8).write(to: skills.appendingPathComponent("SKILL.md"))
+        try Data("src".utf8).write(to: scope.appendingPathComponent("App.swift")) // not editable
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let request = learnRequest(scopePath: "ios", repoRoot: root, localSkillDirs: ["ios/.baton/skills"])
+        let files = LiveLearnAgent.editableFiles(request)
+        let paths = files.map(\.path).sorted()
+        #expect(paths == ["ios/.baton/skills/SKILL.md", "ios/CLAUDE.md", "ios/baton.toml"])
+        #expect(!paths.contains("ios/App.swift"))
     }
 }

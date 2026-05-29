@@ -134,28 +134,31 @@ so a self-reaction cannot manufacture signal.
 
 ### Requirement: Edit Allowlist Excludes Source Code
 
-The system SHALL restrict every proposed edit to the review setup — `baton.toml` review
+The system SHALL restrict every applied edit to the review setup — `baton.toml` review
 prompts and skill lists, local skill directories, and agent-facing documentation — and SHALL
-refuse to modify source code, tests, CI workflows, or dependency manifests. The system SHALL
-enforce the allowlist by inspecting the file changes the agent actually produced and dropping
-any path outside the allowlist, rather than relying on the agent to self-report a compliant
-proposal.
+refuse to modify source code, tests, CI workflows, or dependency manifests. The agent SHALL
+NOT edit files agentically; it SHALL instead return its proposed edits as structured data (a
+JSON object whose `edits` carry each file's repo-relative path and full new contents). The
+system SHALL enforce the allowlist by inspecting the paths in that structured proposal and
+applying only the allowlisted edits — writing them to disk itself — while dropping any path
+outside the allowlist, rather than relying on the agent to self-report a compliant proposal or
+to modify the working tree directly.
 
 #### Scenario: Setup edits are allowed
 
-- **WHEN** the analysis proposes changing a `baton.toml` review prompt or a local skill file
-- **THEN** the system SHALL include that edit in the proposal
+- **WHEN** the agent's proposal includes an edit to a `baton.toml` review prompt or a local skill file
+- **THEN** the system SHALL include that edit in the applied proposal
 
 #### Scenario: Source, test, CI, and dependency edits are refused
 
-- **WHEN** the analysis proposes an edit to a source file, a test, a CI workflow, or a dependency manifest
-- **THEN** the system SHALL refuse that edit and SHALL exclude it from the proposal
+- **WHEN** the agent's proposal includes an edit to a source file, a test, a CI workflow, or a dependency manifest
+- **THEN** the system SHALL refuse that edit and SHALL exclude it from the applied proposal
 
-#### Scenario: Out-of-allowlist changes are dropped even when the agent emits them
+#### Scenario: Out-of-allowlist edits are dropped even when the agent proposes them
 
-- **WHEN** the agent writes changes that touch a path outside the allowlist alongside permitted setup edits
-- **THEN** the system SHALL keep only the permitted setup edits
-- **AND** the system SHALL drop the out-of-allowlist changes from the proposal
+- **WHEN** the agent's structured proposal contains an edit to a path outside the allowlist alongside permitted setup edits
+- **THEN** the system SHALL keep and apply only the permitted setup edits
+- **AND** the system SHALL drop the out-of-allowlist edits from the applied proposal
 
 ### Requirement: Per-Scope Agent Pass Over Setup
 

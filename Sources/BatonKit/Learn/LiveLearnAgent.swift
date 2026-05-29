@@ -1,11 +1,14 @@
 import Foundation
 
-/// The production learning agent: resolves the scope's skills, assembles the
-/// prompt, runs the scope's effective agent CLI in the repository working tree,
-/// and reports the files it changed (discovered via `git`, never self-reported).
+/// The production learning agent: resolves the scope's skills, snapshots the
+/// editable review-setup files, runs the scope's effective agent CLI once, and
+/// parses the structured JSON proposal the agent returns.
 ///
-/// Change discovery diffs the working-tree dirty set before and after the run so
-/// sequential per-scope passes attribute only their own edits.
+/// The agent does NOT edit files agentically (no tools, no extra turns): it
+/// reflects on the signal plus the file snapshot and emits a single JSON object
+/// of `{themes, edits}` where each edit carries the FULL new file contents. The
+/// host (Baton) writes the allowlisted edits itself, so `--max-turns 1` is
+/// correct — the agent only emits text. Mirrors blick's `agent_pass`.
 public struct LiveLearnAgent: LearnAgentRunning {
     private let skills: any SkillResolving
     private let executor: ProcessExecutor
@@ -16,11 +19,9 @@ public struct LiveLearnAgent: LearnAgentRunning {
     }
 
     public func proposeEdits(_ request: LearnAgentRequest) async throws -> LearnAgentOutcome {
-        let git = GitRunner(repoRoot: request.repoRoot)
-        let before = try Self.dirtyPaths(git)
-
         let bodies = resolveSkillBodies(request)
-        let prompt = LearnPromptBuilder.build(request, skillBodies: bodies.bodies)
+        let editable = Self.editableFiles(request)
+        let prompt = LearnPromptBuilder.build(request, skillBodies: bodies.bodies, editableFiles: editable)
         let runner = AgentRegistry.runner(for: request.agent.kind)
         let invocation = InvocationBuilder.make(
             runner: runner,
@@ -31,22 +32,17 @@ public struct LiveLearnAgent: LearnAgentRunning {
             workdir: request.repoRoot
         )
         let result = try await executor.run(invocation, agentName: request.agent.kind.rawValue)
-        // A non-zero exit (auth/billing/model/CLI error) that wrote nothing would
-        // otherwise be reported as "no setup edits to deliver"; surface it as a
-        // failure like the review path (AgentInvoker) does.
+        // A non-zero exit (auth/billing/model/CLI error) must surface as a failure
+        // like the review path (AgentInvoker) does, not be reported as "no edits".
         guard result.status == 0 else {
             throw AgentError.nonZeroExit(
                 agent: request.agent.kind.rawValue, status: result.status, stderrTail: result.stderrTail()
             )
         }
 
-        let after = try Self.dirtyPaths(git)
-        let changed = after.subtracting(before)
-        let edits = changed.sorted().map { path in
-            ProposedEdit(path: path, newContents: Self.readContents(request.repoRoot, path))
-        }
+        let proposal = (try? LearnProposal.parse(Self.unwrapEnvelope(result.stdoutText))) ?? LearnProposal()
         return LearnAgentOutcome(
-            edits: edits,
+            edits: proposal.proposedEdits,
             rawOutput: result.stdoutText,
             warnings: bodies.warnings,
             usage: nil
@@ -71,44 +67,84 @@ public struct LiveLearnAgent: LearnAgentRunning {
         return (bodies, warnings)
     }
 
-    // MARK: - Git change discovery
+    // MARK: - Editable-file enumeration
 
-    /// The set of repo-relative paths git reports as dirty (modified, added,
-    /// deleted, renamed, or untracked). Uses `-z` so paths are NUL-separated and
-    /// never C-quoted, keeping non-ASCII/special names intact for the allowlist
-    /// and the revert (a quoted name would not match the real file on disk).
-    private static func dirtyPaths(_ git: GitRunner) throws -> Set<String> {
-        let output = try git.capture(["status", "--porcelain", "-z", "--untracked-files=all"])
-        guard output.status == 0 else { return [] }
-        return parsePorcelainZ(output.stdout)
+    /// The review-setup files the scope may edit, with their current contents: the
+    /// scope's `baton.toml`, any agent-doc file present at the scope root, and every
+    /// file under the scope's local skill directories. Mirrors ``EditAllowlist``'s
+    /// notion of what is allowed so the snapshot matches what Baton will accept.
+    static func editableFiles(_ request: LearnAgentRequest) -> [(path: String, contents: String)] {
+        let allowlist = EditAllowlist(scopePath: request.scopePath, localSkillDirs: request.localSkillDirs)
+        var paths: Set<String> = []
+
+        paths.insert(scopeRelative(request.scopePath, "baton.toml"))
+        for doc in agentDocNames {
+            paths.insert(scopeRelative(request.scopePath, doc))
+        }
+        for dir in request.localSkillDirs {
+            paths.formUnion(filesUnder(dir, repoRoot: request.repoRoot))
+        }
+
+        return paths.sorted()
+            .filter(allowlist.isAllowed)
+            .compactMap { path in
+                guard let contents = readContents(request.repoRoot, path) else { return nil }
+                return (path, contents)
+            }
     }
 
-    /// Parse `git status --porcelain -z` into the set of affected paths. Records are
-    /// NUL-separated `XY <path>`; a rename/copy record (`R`/`C`) is followed by a
-    /// bare second path field, and both paths are included so the revert and
-    /// allowlist see each side regardless of which is the source.
-    static func parsePorcelainZ(_ data: Data) -> Set<String> {
-        let fields = data.split(separator: 0x00, omittingEmptySubsequences: false)
-            .map { String(bytes: $0, encoding: .utf8) ?? "" }
-        var paths: Set<String> = []
-        var i = 0
-        while i < fields.count {
-            let field = fields[i]
-            i += 1
-            guard field.count > 3 else { continue } // "XY " + at least one path char
-            let status = field.prefix(2)
-            paths.insert(String(field.dropFirst(3)))
-            if status.contains("R") || status.contains("C"), i < fields.count, !fields[i].isEmpty {
-                paths.insert(fields[i])
-                i += 1
-            }
+    private static let agentDocNames = ["CLAUDE.md", "AGENTS.md", "GEMINI.md", "OPENCODE.md", "AGENT.md"]
+
+    private static func scopeRelative(_ scopePath: String, _ name: String) -> String {
+        scopePath.isEmpty ? name : "\(scopePath)/\(name)"
+    }
+
+    /// Every file under `dir` (repo-relative), recursively, as repo-relative paths.
+    private static func filesUnder(_ dir: String, repoRoot: URL) -> Set<String> {
+        let base = repoRoot.appendingPathComponent(dir, isDirectory: true)
+        guard let enumerator = FileManager.default.enumerator(
+            at: base, includingPropertiesForKeys: [.isRegularFileKey]
+        ) else {
+            return []
         }
-        return paths
+        var result: Set<String> = []
+        for case let url as URL in enumerator {
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
+            result.insert(relative(url, to: repoRoot))
+        }
+        return result
+    }
+
+    private static func relative(_ url: URL, to repoRoot: URL) -> String {
+        let rootPath = repoRoot.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(rootPath + "/") else { return url.lastPathComponent }
+        return String(path.dropFirst(rootPath.count + 1))
     }
 
     private static func readContents(_ repoRoot: URL, _ path: String) -> String? {
         let url = repoRoot.appendingPathComponent(path)
-        guard let data = try? Data(contentsOf: url) else { return nil } // deleted
+        guard let data = try? Data(contentsOf: url) else { return nil }
         return String(bytes: data, encoding: .utf8)
+    }
+
+    // MARK: - Envelope unwrap
+
+    /// Unwrap the agent's JSON envelope to the inner model text. Claude's
+    /// `--output-format json` wraps the reply in `{"result":"…"}`; we unwrap that
+    /// here before parsing the inner proposal. Non-enveloped output (other CLIs)
+    /// passes through unchanged.
+    static func unwrapEnvelope(_ stdout: String) -> String {
+        guard let data = stdout.data(using: .utf8),
+              let envelope = try? JSONCodec.decode(Envelope.self, from: data),
+              let inner = envelope.result
+        else {
+            return stdout
+        }
+        return inner
+    }
+
+    private struct Envelope: Decodable {
+        var result: String?
     }
 }
