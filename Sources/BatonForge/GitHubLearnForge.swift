@@ -141,34 +141,22 @@ public struct GitHubLearnForge: LearnSignalSource {
         return options.automationActors.contains(login) || login.hasSuffix("[bot]")
     }
 
+    private var client: GHApiClient {
+        GHApiClient(gh: gh, maxAttempts: options.maxAttempts)
+    }
+
     private func api(method: String, path: String, paginate: Bool) async throws -> GHResult {
         var args = ["api", "--method", method, path]
         if paginate { args.append("--paginate") }
-        return try await retrying(args, stdin: nil)
+        return try await client.run(args, stdin: nil, mapError: Self.terminalError)
     }
 
     private func graphql(_ body: String) async throws -> GHResult {
-        try await retrying(["api", "graphql", "--input", "-"], stdin: body)
+        try await client.run(["api", "graphql", "--input", "-"], stdin: body, mapError: Self.terminalError)
     }
 
-    private func retrying(_ args: [String], stdin: String?) async throws -> GHResult {
-        var lastError = ""
-        for attempt in 1 ... max(1, options.maxAttempts) {
-            let result = try await gh.run(args, stdin: stdin)
-            if result.isSuccess { return result }
-            lastError = (result.stderr + "\n" + result.stdout)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let lowered = lastError.lowercased()
-            let retryable = lowered.contains("rate limit") || lowered.contains("429")
-                || (500 ... 599).contains(httpStatus(lowered) ?? 0)
-            if retryable, attempt < options.maxAttempts { continue }
-            throw ForgeError.publishFailed(detail: lastError.isEmpty ? "gh exited \(result.status)" : lastError)
-        }
-        throw ForgeError.publishFailed(detail: lastError)
-    }
-
-    private func httpStatus(_ text: String) -> Int? {
-        guard let range = text.range(of: #"http (\d{3})"#, options: .regularExpression) else { return nil }
-        return Int(text[range].suffix(3))
+    /// Signal reads have no degrade path: any terminal failure is a hard error.
+    private static func terminalError(_ result: GHResult) -> ForgeError {
+        .publishFailed(detail: GHApiClient.errorText(result))
     }
 }

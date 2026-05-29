@@ -9,11 +9,15 @@ import Foundation
 /// runs; this type owns only the PR create/update decision.
 public struct GitHubLearnDelivery: LearnDelivering {
     private let gh: GHRunning
-    private let options: GitHubForge.Options
+    private let maxAttempts: Int
 
-    public init(gh: GHRunning = LiveGHRunner(), options: GitHubForge.Options = GitHubForge.Options()) {
+    public init(gh: GHRunning = LiveGHRunner(), maxAttempts: Int = 3) {
         self.gh = gh
-        self.options = options
+        self.maxAttempts = maxAttempts
+    }
+
+    private var client: GHApiClient {
+        GHApiClient(gh: gh, maxAttempts: maxAttempts)
     }
 
     public func deliver(_ request: LearnDeliveryRequest) async throws -> LearnDeliveryReport {
@@ -74,39 +78,18 @@ public struct GitHubLearnDelivery: LearnDelivering {
     private func call(method: String, path: String, stdin: String?) async throws -> GHResult {
         var args = ["api", "--method", method, path]
         if stdin != nil { args += ["--input", "-"] }
-
-        var lastError = ""
-        for attempt in 1 ... max(1, options.maxAttempts) {
-            let result = try await gh.run(args, stdin: stdin)
-            if result.isSuccess { return result }
-            lastError = ghErrorText(result)
-            let mapped = mapError(result)
-            if case .serverError = mapped, attempt < options.maxAttempts { continue }
-            if case .rateLimited = mapped, attempt < options.maxAttempts { continue }
-            throw mapped
-        }
-        throw ForgeError.publishFailed(detail: lastError)
+        return try await client.run(args, stdin: stdin, mapError: Self.mapError)
     }
 
-    private func mapError(_ result: GHResult) -> ForgeError {
-        let detail = ghErrorText(result)
+    /// Map a terminal failure. A 403/permission error degrades delivery to preview;
+    /// a 422 (Validation Failed — e.g. "no commits between base and head") is a real
+    /// error and must NOT degrade, so it falls through to publishFailed.
+    static func mapError(_ result: GHResult) -> ForgeError {
+        if let transient = GHApiClient.transientError(result) { return transient }
+        let detail = GHApiClient.errorText(result)
         let text = detail.lowercased()
-        if text.contains("rate limit") || text.contains("429") { return .rateLimited(detail: detail) }
-        if let status = httpStatus(text), (500 ... 599).contains(status) { return .serverError(detail: detail) }
-        // 422 (Validation Failed) is a real error — e.g. "no commits between base and
-        // head" — and must NOT silently degrade to preview, so it is excluded here.
         let denied = text.contains("403") || text.contains("forbidden")
             || text.contains("not accessible by integration") || text.contains("must have write access")
         return denied ? .writePermissionDenied(detail: detail) : .publishFailed(detail: detail)
-    }
-
-    private func ghErrorText(_ result: GHResult) -> String {
-        let combined = (result.stderr + "\n" + result.stdout).trimmingCharacters(in: .whitespacesAndNewlines)
-        return combined.isEmpty ? "gh exited with status \(result.status)" : combined
-    }
-
-    private func httpStatus(_ text: String) -> Int? {
-        guard let range = text.range(of: #"http (\d{3})"#, options: .regularExpression) else { return nil }
-        return Int(text[range].suffix(3))
     }
 }

@@ -20,8 +20,22 @@ struct LearnForgeTests {
         }
     }
 
+    /// Thread-safe call counter so a `@Sendable` responder can vary its reply by
+    /// attempt (the MockGH responder is synchronous and cannot await the actor).
+    final class CallCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var n = 0
+        func next() -> Int {
+            lock.lock(); defer { lock.unlock() }; n += 1; return n
+        }
+    }
+
     private func ok(_ stdout: String) -> GHResult {
         GHResult(status: 0, stdout: stdout, stderr: "")
+    }
+
+    private func http(_ status: Int, _ message: String) -> GHResult {
+        GHResult(status: 1, stdout: "", stderr: "HTTP \(status): \(message)")
     }
 
     private func contains(_ args: [String], _ needle: String) -> Bool {
@@ -182,6 +196,43 @@ struct LearnForgeTests {
         await #expect(throws: ForgeError.self) {
             try await GitHubLearnDelivery(gh: gh).deliver(request())
         }
+    }
+
+    @Test("delivery retries a transient 5xx then succeeds")
+    func deliveryRetriesTransient() async throws {
+        let counter = CallCounter()
+        let gh = MockGH { args, _ in
+            if contains(args, "state=open") { return ok("[]") } // no existing PR
+            // First create attempt 503s, the retry succeeds.
+            return counter.next() == 1 ? http(503, "Service Unavailable") : ok(#"{"number": 42}"#)
+        }
+        let report = try await GitHubLearnDelivery(gh: gh, maxAttempts: 3).deliver(request())
+        #expect(report.created)
+        #expect(report.pullRequestNumber == 42)
+    }
+
+    @Test("delivery gives up after exactly maxAttempts on a persistent 5xx")
+    func deliveryPersistent5xx() async throws {
+        let gh = MockGH { args, _ in
+            contains(args, "state=open") ? ok("[]") : http(503, "Service Unavailable")
+        }
+        await #expect(throws: ForgeError.self) {
+            try await GitHubLearnDelivery(gh: gh, maxAttempts: 2).deliver(request())
+        }
+        let posts = await gh.calls.filter { $0.args.contains("POST") }
+        #expect(posts.count == 2) // tried exactly maxAttempts, no more
+    }
+
+    @Test("signal read retries a transient 5xx then succeeds")
+    func signalReadRetriesTransient() async throws {
+        let counter = CallCounter()
+        let gh = MockGH { _, _ in
+            counter.next() == 1 ? http(503, "Service Unavailable") : ok("[]")
+        }
+        let forge = GitHubLearnForge(gh: gh, repo: "o/r", now: fixedNow)
+        let prs = try await forge.mergedPullRequests(lookbackDays: 14)
+        #expect(prs.isEmpty)
+        #expect(await gh.calls.count == 2) // one failed, one retried-and-succeeded
     }
 
     private func request() -> LearnDeliveryRequest {

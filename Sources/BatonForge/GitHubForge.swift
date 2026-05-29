@@ -209,7 +209,7 @@ public struct GitHubForge: Forge {
         let json = try GitHubAPIBodies.json(body)
         let result = try await gh.run(["api", "graphql", "--input", "-"], stdin: json)
         if !result.isSuccess {
-            throw ForgeError.publishFailed(detail: ghErrorText(result))
+            throw ForgeError.publishFailed(detail: GHApiClient.errorText(result))
         }
     }
 
@@ -247,42 +247,27 @@ public struct GitHubForge: Forge {
         var paginate = false
     }
 
+    private var api: GHApiClient {
+        GHApiClient(gh: gh, maxAttempts: options.maxAttempts)
+    }
+
     private func call(_ request: APIRequest) async throws -> GHResult {
         var args = ["api", "--method", request.method, request.path]
         if request.paginate { args += ["--paginate"] }
         if request.stdin != nil { args += ["--input", "-"] }
-
-        var lastError = ""
-        for attempt in 1 ... max(1, options.maxAttempts) {
-            let result = try await gh.run(args, stdin: request.stdin)
-            if result.isSuccess { return result }
-
-            let mapped = mapError(result, isCheckRun: request.isCheckRun)
-            lastError = ghErrorText(result)
-            switch mapped {
-            case .rateLimited, .serverError:
-                if attempt < options.maxAttempts { continue }
-                throw mapped
-            default:
-                throw mapped
-            }
+        return try await api.run(args, stdin: request.stdin) { result in
+            Self.mapError(result, isCheckRun: request.isCheckRun)
         }
-        throw ForgeError.publishFailed(detail: lastError)
     }
 
-    /// Map a non-zero `gh api` result to a typed ``ForgeError``.
-    private func mapError(_ result: GHResult, isCheckRun: Bool) -> ForgeError {
-        let detail = ghErrorText(result)
+    /// Map a terminal (non-retryable) `gh api` failure to a typed ``ForgeError``.
+    /// A Check Run 403/422 degrades; a write 403/422 denies; anything else fails.
+    static func mapError(_ result: GHResult, isCheckRun: Bool) -> ForgeError {
+        if let transient = GHApiClient.transientError(result) { return transient }
+        let detail = GHApiClient.errorText(result)
         let text = detail.lowercased()
-        if text.contains("rate limit") || text.contains("429") {
-            return .rateLimited(detail: detail)
-        }
-        if let status = httpStatus(in: text), (500 ... 599).contains(status) {
-            return .serverError(detail: detail)
-        }
         let isForbidden = text.contains("403") || text.contains("422")
             || text.contains("forbidden") || text.contains("not accessible by integration")
-        // Check Run creation forbidden → degrade (only for the check-runs endpoint).
         if isCheckRun, isForbidden {
             return .checkRunForbidden(detail: detail)
         }
@@ -290,15 +275,5 @@ public struct GitHubForge: Forge {
             return .writePermissionDenied(detail: detail)
         }
         return .publishFailed(detail: detail)
-    }
-
-    private func ghErrorText(_ result: GHResult) -> String {
-        let combined = (result.stderr + "\n" + result.stdout).trimmingCharacters(in: .whitespacesAndNewlines)
-        return combined.isEmpty ? "gh exited with status \(result.status)" : combined
-    }
-
-    private func httpStatus(in text: String) -> Int? {
-        guard let range = text.range(of: #"http (\d{3})"#, options: .regularExpression) else { return nil }
-        return Int(text[range].suffix(3))
     }
 }
