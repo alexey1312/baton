@@ -56,26 +56,7 @@ public struct ProcessExecutor: Sendable {
 
         // Arm the timeout terminator before waiting.
         let timedOut = TimeoutFlag()
-        var timer: DispatchSourceTimer?
-        if invocation.timeout > 0 {
-            let source = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
-            source.schedule(deadline: .now() + .seconds(invocation.timeout))
-            source.setEventHandler {
-                guard process.isRunning else { return }
-                timedOut.set()
-                process.terminate()
-                #if !os(Windows)
-                // A child that traps/ignores SIGTERM would hang waitUntilExit
-                // forever (defeating the very timeout meant to bound it); escalate
-                // to SIGKILL after a short grace period.
-                DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(Self.killGraceSeconds)) {
-                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                }
-                #endif
-            }
-            source.resume()
-            timer = source
-        }
+        let timer = armTimeout(process, seconds: invocation.timeout, flag: timedOut)
 
         let start = Date()
         do {
@@ -107,6 +88,27 @@ public struct ProcessExecutor: Sendable {
             stderr: buffers.errString,
             duration: Date().timeIntervalSince(start)
         )
+    }
+
+    /// Schedule a one-shot terminator that flags the timeout and SIGTERMs the
+    /// process at the deadline, escalating to SIGKILL after a grace period (POSIX)
+    /// so a child that ignores SIGTERM cannot hang `waitUntilExit` forever.
+    private static func armTimeout(_ process: Process, seconds: Int, flag: TimeoutFlag) -> DispatchSourceTimer? {
+        guard seconds > 0 else { return nil }
+        let source = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
+        source.schedule(deadline: .now() + .seconds(seconds))
+        source.setEventHandler {
+            guard process.isRunning else { return }
+            flag.set()
+            process.terminate()
+            #if !os(Windows)
+            DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(killGraceSeconds)) {
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+            }
+            #endif
+        }
+        source.resume()
+        return source
     }
 }
 

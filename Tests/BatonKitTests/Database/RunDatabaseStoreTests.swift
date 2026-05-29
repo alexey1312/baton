@@ -114,10 +114,22 @@ struct RunDatabaseStoreTests {
             createdAt: t0, status: .success,
             tasks: [
                 // A: [t0, t0+3s]; B: [t0+1s, t0+4s] — overlapping. Span = 4s, sum = 6s.
-                TaskRecordInput(scope: "a", review: "r", agentKind: "claude",
-                                startedAt: t0, durationMs: 3000, failOn: "high"),
-                TaskRecordInput(scope: "b", review: "r", agentKind: "claude",
-                                startedAt: t0.addingTimeInterval(1), durationMs: 3000, failOn: "high"),
+                TaskRecordInput(
+                    scope: "a",
+                    review: "r",
+                    agentKind: "claude",
+                    startedAt: t0,
+                    durationMs: 3000,
+                    failOn: "high"
+                ),
+                TaskRecordInput(
+                    scope: "b",
+                    review: "r",
+                    agentKind: "claude",
+                    startedAt: t0.addingTimeInterval(1),
+                    durationMs: 3000,
+                    failOn: "high"
+                ),
             ]
         )
         #expect(store.recordRun(input).isEmpty)

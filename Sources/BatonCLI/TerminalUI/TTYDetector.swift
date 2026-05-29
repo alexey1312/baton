@@ -35,17 +35,15 @@ enum TTYDetector {
     }
 
     /// Resolves the effective output mode from the global flags and environment.
+    ///
+    /// `FORCE_COLOR` keeps the colored interactive mode even when piped or in CI;
+    /// `NO_COLOR` (no-color.org) joins the existing no-color triggers. Explicit
+    /// `--quiet`/`--verbose` still take precedence for verbosity.
     static func effectiveMode(verbose: Bool, quiet: Bool) -> OutputMode {
         if quiet { return .quiet }
         if verbose { return .verbose }
-        if !isTTY || isCI { return .plain }
+        if forceColor { return .normal }
+        if noColor || !isTTY || isCI { return .plain }
         return .normal
-    }
-
-    /// Whether colors should be enabled given the environment.
-    static var colorsEnabled: Bool {
-        if noColor { return false }
-        if forceColor { return true }
-        return isTTY && !isCI
     }
 }

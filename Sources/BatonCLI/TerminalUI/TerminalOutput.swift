@@ -13,10 +13,14 @@ final class TerminalOutput: @unchecked Sendable {
     private init() {}
 
     /// Write a line to stdout.
+    ///
+    /// Writes via `FileHandle.standardOutput` (unbuffered) rather than `print`
+    /// (block-buffered when stdout is not a TTY) so stdout and the unbuffered
+    /// stderr stay in emission order when both are redirected to one destination.
     func out(_ message: String) {
         lock.lock()
         defer { lock.unlock() }
-        print(message)
+        FileHandle.standardOutput.write(Data((message + "\n").utf8))
     }
 
     /// Write a line to stderr.

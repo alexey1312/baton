@@ -19,7 +19,7 @@ public struct DiffCollector: Sendable {
         var files = DiffParser.files(nameStatus: nameStatus.stdout, patch: patch)
 
         if includeUntracked {
-            files.append(contentsOf: try collectUntracked())
+            try files.append(contentsOf: collectUntracked())
         }
         return RepoDiff(base: base, files: files)
     }

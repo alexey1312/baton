@@ -25,23 +25,28 @@ public enum ScopeDiscovery {
         var scopes: [ScopeConfig] = []
         var warnings: [String] = []
 
-        try walk(directory: repoRoot.standardizedFileURL, relative: "", warn: { warnings.append($0) }) { dir, relative in
-            let configURL = dir.appendingPathComponent("baton.toml")
-            guard FileManager.default.fileExists(atPath: configURL.path) else { return }
+        try walk(
+            directory: repoRoot.standardizedFileURL,
+            relative: "",
+            warn: { warnings.append($0) },
+            visit: { dir, relative in
+                let configURL = dir.appendingPathComponent("baton.toml")
+                guard FileManager.default.fileExists(atPath: configURL.path) else { return }
 
-            let configRelative = relative.isEmpty ? "baton.toml" : "\(relative)/baton.toml"
-            let text = try String(contentsOf: configURL, encoding: .utf8)
-            let parsed = try ConfigParser.parse(text, path: configRelative)
-            warnings.append(contentsOf: parsed.warnings)
+                let configRelative = relative.isEmpty ? "baton.toml" : "\(relative)/baton.toml"
+                let text = try String(contentsOf: configURL, encoding: .utf8)
+                let parsed = try ConfigParser.parse(text, path: configRelative)
+                warnings.append(contentsOf: parsed.warnings)
 
-            let autoSkills = discoverLocalSkills(in: dir)
-            scopes.append(ScopeConfig(
-                path: relative,
-                configPath: configRelative,
-                config: parsed.config,
-                autoSkills: autoSkills
-            ))
-        }
+                let autoSkills = discoverLocalSkills(in: dir)
+                scopes.append(ScopeConfig(
+                    path: relative,
+                    configPath: configRelative,
+                    config: parsed.config,
+                    autoSkills: autoSkills
+                ))
+            }
+        )
 
         guard !scopes.isEmpty else {
             throw ConfigError.noConfigFound(repoRoot: repoRoot.path)

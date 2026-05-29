@@ -63,7 +63,7 @@ struct ReviewCommand: AsyncParsableCommand {
                     base: resolvedBase, headSHA: headSHA, tasks: [], database: hook
                 )
                 emitDatabaseWarnings(outcome.databaseErrors)
-                TerminalOutput.shared.out(NooraUI.info("No changes to review.", useColors: global.outputMode.useColors))
+                try emitNothing(store: store, message: "No changes to review.")
                 return
             }
 
@@ -151,10 +151,10 @@ struct ReviewCommand: AsyncParsableCommand {
     }
 
     private func renderAndExit(store: RunRecordStore, tasks: [CompletedTask]) throws {
-        let run = try store.load(runId: nil)
         if tasks.isEmpty {
-            TerminalOutput.shared.out(NooraUI.info("Nothing to review.", useColors: global.outputMode.useColors))
+            try emitNothing(store: store, message: "Nothing to review.")
         } else {
+            let run = try store.load(runId: nil)
             let format: RenderFormat = json ? .json : .terminal
             let output = try Renderer.render(
                 run: run,
@@ -167,6 +167,22 @@ struct ReviewCommand: AsyncParsableCommand {
         if ReviewOutcome(results: tasks.map(\.result)).shouldFailExit {
             throw ExitCode.failure
         }
+    }
+
+    /// Emit a "nothing to do" outcome while honoring `--json`: stdout always stays
+    /// a valid JSON document (an empty `results` array) so `baton review --json |
+    /// jq` does not break on an unchanged tree, and the human note goes to stderr.
+    /// In terminal mode the note goes to stdout as before.
+    private func emitNothing(store: RunRecordStore, message: String) throws {
+        let colors = global.outputMode.useColors
+        guard json else {
+            TerminalOutput.shared.out(NooraUI.info(message, useColors: colors))
+            return
+        }
+        let run = try store.load(runId: nil)
+        let output = try Renderer.render(run: run, format: .json, headSHA: nil, useColors: false)
+        TerminalOutput.shared.out(output)
+        TerminalOutput.shared.err(NooraUI.info(message, useColors: colors))
     }
 
     private func rootDefaults(_ effectives: [EffectiveConfig]) -> EffectiveDefaults? {
