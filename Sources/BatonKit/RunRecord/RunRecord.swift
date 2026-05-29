@@ -214,6 +214,7 @@ public struct RunRecordStore: Sendable {
                 review: result.review,
                 agentKind: result.agentKind ?? "unknown",
                 model: result.model,
+                startedAt: task.startedAt,
                 durationMs: result.durationMs,
                 inputTokens: result.usage?.inputTokens,
                 outputTokens: result.usage?.outputTokens,

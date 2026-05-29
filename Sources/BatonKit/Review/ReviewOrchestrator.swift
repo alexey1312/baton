@@ -5,11 +5,15 @@ public struct CompletedTask: Sendable {
     public var result: ReviewTaskResult
     public var prompt: String
     public var rawOutput: String
+    /// When this task began (wall-clock), so the run's true elapsed span can be
+    /// derived across concurrent tasks instead of summing their durations.
+    public var startedAt: Date?
 
-    public init(result: ReviewTaskResult, prompt: String, rawOutput: String) {
+    public init(result: ReviewTaskResult, prompt: String, rawOutput: String, startedAt: Date? = nil) {
         self.result = result
         self.prompt = prompt
         self.rawOutput = rawOutput
+        self.startedAt = startedAt
     }
 }
 
@@ -127,6 +131,7 @@ public struct ReviewOrchestrator: Sendable {
 
     private func runOne(_ spec: TaskSpec) async -> CompletedTask {
         let failOn = spec.review.failOn ?? spec.defaults.failOn
+        let startedAt = Date()
         do {
             let run = try await executeChunks(spec)
             let result = ReviewTaskResult(
@@ -144,7 +149,8 @@ public struct ReviewOrchestrator: Sendable {
             return CompletedTask(
                 result: result,
                 prompt: run.prompts.joined(separator: "\n\n=== next chunk ===\n\n"),
-                rawOutput: run.outputs.joined(separator: "\n")
+                rawOutput: run.outputs.joined(separator: "\n"),
+                startedAt: startedAt
             )
         } catch {
             let message = (error as? any LocalizedError)?.errorDescription ?? "\(error)"
@@ -158,7 +164,7 @@ public struct ReviewOrchestrator: Sendable {
                 agentKind: spec.agent.kind.rawValue,
                 model: spec.model
             )
-            return CompletedTask(result: result, prompt: "", rawOutput: "")
+            return CompletedTask(result: result, prompt: "", rawOutput: "", startedAt: startedAt)
         }
     }
 

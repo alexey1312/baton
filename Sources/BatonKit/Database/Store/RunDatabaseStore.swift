@@ -154,16 +154,30 @@ public struct RunDatabaseStore: Sendable {
             if let value = task.costUSD {
                 totals.totalCostUSD = (totals.totalCostUSD ?? 0) + value
             }
-            if let value = task.durationMs {
-                totals.durationMs = (totals.durationMs ?? 0) + value
-            }
             if totals.agentKind == nil {
                 totals.agentKind = task.agentKind
             } else if totals.agentKind != task.agentKind {
                 totals.agentKind = "mixed"
             }
         }
+        totals.durationMs = runWallClockMs(tasks)
         return totals
+    }
+
+    /// Run wall-clock in ms: the span from the earliest task start to the latest
+    /// task end. Tasks run concurrently (see `max_concurrency`), so summing
+    /// per-task durations overstates the elapsed time. Falls back to the sum of
+    /// durations when no task carries a start timestamp (legacy/best-effort).
+    private func runWallClockMs(_ tasks: [TaskRecordInput]) -> Int? {
+        let intervals = tasks.compactMap { task -> (start: Date, end: Date)? in
+            guard let start = task.startedAt, let ms = task.durationMs else { return nil }
+            return (start, start.addingTimeInterval(Double(ms) / 1000.0))
+        }
+        if let earliest = intervals.map(\.start).min(), let latest = intervals.map(\.end).max() {
+            return Int((latest.timeIntervalSince(earliest) * 1000).rounded())
+        }
+        let durations = tasks.compactMap(\.durationMs)
+        return durations.isEmpty ? nil : durations.reduce(0, +)
     }
 
     private func insertRun(input: RunRecordInput, totals: Totals, db: Connection) throws {

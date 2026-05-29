@@ -44,16 +44,18 @@ public final class HistoryRepository: @unchecked Sendable {
             args.append(repoId)
         }
         let clause = conditions.isEmpty ? "" : "WHERE \(conditions.joined(separator: " AND "))"
+        // Bind LIMIT as a parameter and clamp non-negative: a negative literal is
+        // treated by SQLite as "no limit" and would return the entire table.
         let sql = """
         SELECT run_id, repo_label, repo_id, created_at, base_ref, head_sha,
                duration_ms, total_findings, total_cost_usd, status, agent_kind
         FROM runs
         \(clause)
         ORDER BY created_at DESC
-        LIMIT \(limit)
+        LIMIT ?
         """
         var results: [RunSummary] = []
-        for row in try connection.prepare(sql, args) {
+        for row in try connection.prepare(sql, args + [Int64(max(0, limit))]) {
             guard let summary = Self.summary(from: row) else { continue }
             results.append(summary)
         }

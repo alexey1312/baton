@@ -100,6 +100,32 @@ struct RunDatabaseStoreTests {
         #expect(agent == "mixed")
     }
 
+    @Test("run duration_ms is the concurrent wall-clock span, not the sum of task durations")
+    func wallClockSpan() throws {
+        let tempRoot = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+        defer { BatonDatabase._resetForTesting() }
+
+        let store = RunDatabaseStore(location: .perRepo(repoRoot: tempRoot))
+        let identity = RepoIdentity.resolve(repoRoot: URL(fileURLWithPath: "/tmp/example"))
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let input = RunRecordInput(
+            runId: "run-span", repo: identity, baseRef: "main", headSHA: "sha",
+            createdAt: t0, status: .success,
+            tasks: [
+                // A: [t0, t0+3s]; B: [t0+1s, t0+4s] — overlapping. Span = 4s, sum = 6s.
+                TaskRecordInput(scope: "a", review: "r", agentKind: "claude",
+                                startedAt: t0, durationMs: 3000, failOn: "high"),
+                TaskRecordInput(scope: "b", review: "r", agentKind: "claude",
+                                startedAt: t0.addingTimeInterval(1), durationMs: 3000, failOn: "high"),
+            ]
+        )
+        #expect(store.recordRun(input).isEmpty)
+        let database = try BatonDatabase.open(at: DatabasePathResolver.perRepoDatabaseURL(repoRoot: tempRoot))
+        let ms = try database.connection.scalar("SELECT duration_ms FROM runs WHERE run_id = ?", "run-span") as? Int64
+        #expect(ms == 4000)
+    }
+
     @Test("makeFindingId is stable for the same dedupe key and changes with severity")
     func stableFindingIds() {
         let base = Finding(file: "a.swift", line: 1, severity: .high, title: "t", body: "b")
