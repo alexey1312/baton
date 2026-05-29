@@ -6,10 +6,13 @@ import Foundation
 ///
 /// Ported from ExFig's subprocess runner pattern.
 public struct ProcessExecutor: Sendable {
-    /// Grace period after SIGTERM before escalating to SIGKILL on a child that
-    /// traps or ignores SIGTERM (POSIX only — `terminate()` is already forceful on
-    /// Windows).
-    private static let killGraceSeconds = 5
+    /// Grace period after SIGTERM before escalating to SIGKILL on a child that traps,
+    /// ignores, or never receives SIGTERM (POSIX only — `terminate()` is already
+    /// forceful on Windows). Kept short: on swift-corelibs-foundation/Linux SIGTERM
+    /// via `terminate()` does not reliably reach a `/usr/bin/env`-wrapped child, so the
+    /// uncatchable `kill(pid, SIGKILL)` is what actually enforces the deadline — it
+    /// must fire well before any long-running child would exit on its own.
+    private static let killGraceSeconds = 1
 
     public init() {}
 
