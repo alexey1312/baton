@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2026-05-29
+
+### Bug Fixes
+
+- Untrack accidental agent-worktree gitlink; ignore .claude/worktrees/ by @alexey1312
+
+
+### Features
+
+- **learn**: Make author-reaction exclusion configurable (count_author_reactions) by @alexey1312
+
+
+### Other
+
+- Remove second learn-signal probe by @alexey1312
+
+
+### Testing
+
+- Second learn-signal probe (force-unwrap) for a 2-thread theme  by @alexey1312 in [#3](https://github.com/alexey1312/swift-baton/pull/3)
+
+
 ## [0.1.1] - 2026-05-29
 
 ### Bug Fixes
