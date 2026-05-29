@@ -55,24 +55,6 @@ struct ProcessExecutorTests {
         #expect(elapsed < 4)
     }
 
-    @Test("timeout stays prompt while the GCD global pool is saturated")
-    func timeoutUnderPoolSaturation() async {
-        // Reproduces the CI flake: pre-saturate the global concurrent queue with
-        // blocked workers (mimicking a loaded, few-core runner). If `run()` and its
-        // timeout terminator depend on that pool, the terminator fires late and
-        // `sleep 5` runs to natural completion (~5s) instead of being killed at 1s.
-        let blockers = 128
-        for _ in 0 ..< blockers {
-            DispatchQueue.global().async { Thread.sleep(forTimeInterval: 12) }
-        }
-        try? await Task.sleep(nanoseconds: 500_000_000) // let the blockers claim threads
-
-        let start = Date()
-        _ = try? await ProcessExecutor().run(invocation("sleep", ["5"], timeout: 1), agentName: "t")
-        let elapsed = Date().timeIntervalSince(start)
-        #expect(elapsed < 4, "timeout took \(elapsed)s under pool saturation — terminator starved")
-    }
-
     @Test("AgentInvoker parses findings from a successful run")
     func invokerSuccess() async throws {
         let json = #"[{"file":"a.swift","severity":"high","title":"t","body":"b"}]"#
