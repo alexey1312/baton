@@ -429,6 +429,31 @@ struct SkillPinEnforcementTests {
         }
     }
 
+    @Test("a remote skill pinned to a branch/tag rather than a SHA is rejected")
+    func nonShaRefRejected() throws {
+        try SkillTestFixtures.withTempDir { root in
+            let remote = root.appendingPathComponent("remotes/org/skills", isDirectory: true)
+            let git = try SkillTestFixtures.initRepo(remote)
+            try SkillTestFixtures.writeFile(remote.appendingPathComponent("skills/owasp"), "SKILL.md", "x")
+            _ = try SkillTestFixtures.commitAll(git)
+
+            let r = SkillTestFixtures.remoteResolver(root: root)
+            do {
+                _ = try r.resolve(
+                    SkillConfig(name: "owasp", source: "org/skills/owasp", ref: "main"),
+                    declaringConfigDir: root,
+                    security: SecurityConfig(requirePinnedSkills: true)
+                )
+                Issue.record("expected refNotPinned")
+            } catch let error as SkillError {
+                guard case .refNotPinned = error else {
+                    Issue.record("expected refNotPinned, got \(error)")
+                    return
+                }
+            }
+        }
+    }
+
     @Test("pinned remote skill with a non-existent SHA fails")
     func pinnedBadShaFails() throws {
         try SkillTestFixtures.withTempDir { root in

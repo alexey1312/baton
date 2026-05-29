@@ -155,8 +155,16 @@ public struct SkillResolver: Sendable {
 
         // 2. Mandatory SHA pinning (remote-only).
         let pinningRequired = (security?.requirePinnedSkills ?? true) && !allowUnpinned
-        if pinningRequired, skill.ref == nil || skill.ref?.isEmpty == true {
-            throw SkillError.missingRequiredRef(name: skill.name, source: skill.source)
+        if pinningRequired {
+            guard let ref = skill.ref, !ref.isEmpty else {
+                throw SkillError.missingRequiredRef(name: skill.name, source: skill.source)
+            }
+            // A mutable branch/tag satisfies "has a ref" but not "the exact bytes you
+            // audited": a moved ref would swap the inlined markdown on the next cold
+            // fetch. Require a full commit SHA (40 hex for SHA-1, 64 for SHA-256).
+            guard ref.count == 40 || ref.count == 64, ref.allSatisfy(\.isHexDigit) else {
+                throw SkillError.refNotPinned(name: skill.name, source: skill.source, ref: ref)
+            }
         }
 
         // 3. git availability.

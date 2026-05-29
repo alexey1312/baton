@@ -67,7 +67,7 @@ extension SkillResolver {
             skillDir.appendingPathComponent("SKILL.md").standardizedFileURL.path,
             skillDir.appendingPathComponent("README.md").standardizedFileURL.path,
         ])
-        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey]
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .fileSizeKey]
         guard let enumerator = fileManager.enumerator(
             at: skillDir,
             includingPropertiesForKeys: keys,
@@ -93,6 +93,11 @@ extension SkillResolver {
             // directory must be rejected here rather than silently skipped.
             try assertNoSymlinkEscape(standardized, within: skillDir, skillName: skillName)
             guard values.isRegularFile == true else { continue }
+            // Reject by on-disk size *before* reading, so a single oversized file
+            // cannot spike memory ahead of the cumulative post-read check.
+            if totalBytes + (values.fileSize ?? 0) > referencesBudgetBytes {
+                throw SkillError.referencesBudgetExceeded(name: skillName, limitBytes: referencesBudgetBytes)
+            }
             let content = try readReference(standardized, skillName: skillName)
             totalBytes += content.utf8.count
             if totalBytes > referencesBudgetBytes {

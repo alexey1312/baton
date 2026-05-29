@@ -19,6 +19,9 @@ public enum SkillError: BatonError {
     case symlinkEscape(name: String, path: String)
     /// A remote skill omits a required `ref` while pin enforcement is in effect.
     case missingRequiredRef(name: String, source: String)
+    /// A remote skill's `ref` is present but not a full commit SHA (e.g. a mutable
+    /// branch or tag), so the audited-bytes guarantee would not hold.
+    case refNotPinned(name: String, source: String, ref: String)
     /// A remote `source` does not match any pattern in `allowed_skill_sources`.
     case sourceNotAllowed(name: String, source: String, allowlist: [String])
     /// The resolved skill directory could not be enumerated (race, permission denial,
@@ -48,6 +51,8 @@ public enum SkillError: BatonError {
                 " or has no existing target"
         case let .missingRequiredRef(name, source):
             "Remote skill '\(name)' (\(source)) is missing a pinned commit ref"
+        case let .refNotPinned(name, source, ref):
+            "Remote skill '\(name)' (\(source)) ref '\(ref)' is not a full commit SHA"
         case let .sourceNotAllowed(name, source, _):
             "Remote skill '\(name)' source '\(source)' is not in allowed_skill_sources"
         case let .skillDirectoryUnreadable(name, path):
@@ -75,6 +80,8 @@ public enum SkillError: BatonError {
             "Remove the escaping symlink or point the skill at a path within its skill directory."
         case .missingRequiredRef:
             "Pin the skill to a commit SHA via `ref`, or pass --allow-unpinned."
+        case .refNotPinned:
+            "Use a full 40- or 64-character commit SHA in `ref` (not a branch or tag), or pass --allow-unpinned."
         case let .sourceNotAllowed(_, _, allowlist):
             "Add the source to allowed_skill_sources (currently: \(allowlist.joined(separator: ", ")))."
         case .skillDirectoryUnreadable:

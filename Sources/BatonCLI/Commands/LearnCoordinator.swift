@@ -34,10 +34,15 @@ enum LearnCoordinator {
         let reader = GitHubLearnForge(repo: repo)
         let signals = try await reader.collectSignal(lookbackDays: lookback)
 
+        // Honor the root scope's configured references budget so learn and review
+        // enforce the same skill policy (review threads it via rootReferencesBudget).
+        let referencesBudget = plans.first { $0.scope.path.isEmpty }?.effective.referencesBudgetBytes
+            ?? ConfigDefaults.referencesBudgetBytes
         let resolver = SkillResolver(
             repoRoot: options.repoRoot,
             cacheDir: SkillResolver.defaultCacheDir(),
-            git: GitRunner(repoRoot: options.repoRoot)
+            git: GitRunner(repoRoot: options.repoRoot),
+            referencesBudgetBytes: referencesBudget
         )
         let engine = LearnEngine(agent: LiveLearnAgent(skills: resolver))
         let result = try await engine.run(plans: plans, signals: signals, repoRoot: options.repoRoot)
