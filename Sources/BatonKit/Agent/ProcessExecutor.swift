@@ -6,6 +6,11 @@ import Foundation
 ///
 /// Ported from ExFig's subprocess runner pattern.
 public struct ProcessExecutor: Sendable {
+    /// Grace period after SIGTERM before escalating to SIGKILL on a child that
+    /// traps or ignores SIGTERM (POSIX only — `terminate()` is already forceful on
+    /// Windows).
+    private static let killGraceSeconds = 5
+
     public init() {}
 
     /// Run `invocation`, returning the captured result. Throws `AgentError.timedOut`
@@ -56,10 +61,17 @@ public struct ProcessExecutor: Sendable {
             let source = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
             source.schedule(deadline: .now() + .seconds(invocation.timeout))
             source.setEventHandler {
-                if process.isRunning {
-                    timedOut.set()
-                    process.terminate()
+                guard process.isRunning else { return }
+                timedOut.set()
+                process.terminate()
+                #if !os(Windows)
+                // A child that traps/ignores SIGTERM would hang waitUntilExit
+                // forever (defeating the very timeout meant to bound it); escalate
+                // to SIGKILL after a short grace period.
+                DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(Self.killGraceSeconds)) {
+                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
                 }
+                #endif
             }
             source.resume()
             timer = source
@@ -91,18 +103,20 @@ public struct ProcessExecutor: Sendable {
 
         return ProcessResult(
             status: process.terminationStatus,
-            stdout: buffers.out,
-            stderr: String(bytes: buffers.err, encoding: .utf8) ?? "",
+            stdout: buffers.outData,
+            stderr: buffers.errString,
             duration: Date().timeIntervalSince(start)
         )
     }
 }
 
-/// Thread-safe accumulator for the child's stdout/stderr.
+/// Thread-safe accumulator for the child's stdout/stderr. Reads take the lock too
+/// (mirroring `BatonForge`'s `GHRunner.StreamBuffers`) so the final snapshot cannot
+/// race a readability handler still draining the pipe.
 private final class StreamBuffers: @unchecked Sendable {
     private let lock = NSLock()
-    private(set) var out = Data()
-    private(set) var err = Data()
+    private var out = Data()
+    private var err = Data()
 
     func appendOut(_ data: Data) {
         guard !data.isEmpty else { return }
@@ -112,6 +126,16 @@ private final class StreamBuffers: @unchecked Sendable {
     func appendErr(_ data: Data) {
         guard !data.isEmpty else { return }
         lock.lock(); err.append(data); lock.unlock()
+    }
+
+    var outData: Data {
+        lock.lock(); defer { lock.unlock() }
+        return out
+    }
+
+    var errString: String {
+        lock.lock(); defer { lock.unlock() }
+        return String(bytes: err, encoding: .utf8) ?? ""
     }
 }
 

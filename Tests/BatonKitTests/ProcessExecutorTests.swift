@@ -36,11 +36,23 @@ struct ProcessExecutorTests {
         #expect(result.stdoutText == "piped-input")
     }
 
-    @Test("terminates a process that exceeds the timeout")
+    @Test("times out with .timedOut and kills the process promptly")
     func timeout() async {
-        await #expect(throws: AgentError.self) {
+        let start = Date()
+        var thrown: AgentError?
+        do {
             _ = try await ProcessExecutor().run(invocation("sleep", ["5"], timeout: 1), agentName: "test")
+        } catch let error as AgentError {
+            thrown = error
+        } catch {}
+        let elapsed = Date().timeIntervalSince(start)
+        // Specifically .timedOut (not, say, a missing-binary error masquerading as a pass).
+        guard case .timedOut = thrown else {
+            Issue.record("expected AgentError.timedOut, got \(String(describing: thrown))")
+            return
         }
+        // The process must be terminated near the 1s deadline, not allowed to run the full 5s.
+        #expect(elapsed < 4)
     }
 
     @Test("AgentInvoker parses findings from a successful run")
