@@ -1,19 +1,14 @@
 name: Install Claude CLI
 description: >-
-  Install Node.js and the headless `claude` CLI (@anthropic-ai/claude-code) into a
-  Debian-based job (e.g. the swift:6.3 container) so baton can invoke the claude agent.
-  Self-contained: installs its own prerequisites. Authentication is via the
-  ANTHROPIC_API_KEY environment variable supplied by the calling job.
+  Install the headless `claude` CLI (@anthropic-ai/claude-code) on an ubuntu-latest
+  runner (Node.js is preinstalled). Authentication is via ANTHROPIC_API_KEY or
+  CLAUDE_CODE_OAUTH_TOKEN supplied by the calling job. Runs as the non-root `runner`
+  user — claude refuses `--dangerously-skip-permissions` (which baton passes) under root.
 runs:
   using: composite
   steps:
-    - name: Install Node.js and the claude CLI
-      shell: bash
+    - shell: bash
       run: |
         set -euo pipefail
-        apt-get update
-        apt-get install -y curl ca-certificates gnupg
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-        apt-get install -y nodejs
-        npm install -g @anthropic-ai/claude-code
+        sudo npm install -g @anthropic-ai/claude-code
         claude --version

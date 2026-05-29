@@ -2,9 +2,13 @@ name: Baton Review
 
 # Dogfood: baton reviews its own pull requests and posts findings as inline review
 # comments (the 👍/👎 reactions on them feed `baton learn`). Uses the repo's baton.toml
-# agent (claude/haiku), so it needs the ANTHROPIC_API_KEY secret. Without that secret
-# the review job is skipped (not failed) — a `guard` job emits a notice instead, so PRs
-# stay green until the secret is added.
+# agent (claude/haiku), so it needs an agent credential secret (ANTHROPIC_API_KEY or
+# CLAUDE_CODE_OAUTH_TOKEN). Without one, the review job is skipped (not failed) — a
+# `guard` job emits a notice — so PRs stay green until a secret is added.
+#
+# Runs on ubuntu-latest (not a container): baton invokes claude with
+# `--dangerously-skip-permissions`, which claude refuses under root, and container jobs
+# run as root. The non-root runner also has Node, git and gh preinstalled.
 
 on:
   pull_request:
@@ -42,8 +46,6 @@ jobs:
     needs: guard
     if: needs.guard.outputs.enabled == 'true'
     runs-on: ubuntu-latest
-    container:
-      image: swift:6.3
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -53,11 +55,6 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y curl git gh
-
       # Check out the PR head by SHA (not head.ref — that is attacker-controllable).
       # fetch-depth: 0 also brings origin/* (incl. origin/<base>) for the diff base.
       - uses: actions/checkout@v6
@@ -65,20 +62,22 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      # The container runs git as a different uid than the checkout owner; without this
-      # both our git calls and baton's GitRunner fail with "detected dubious ownership".
-      - name: Trust the workspace for git
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
       - name: Install claude CLI
         uses: ./.github/actions/install-claude
 
+      # Install the latest released baton via mise's github backend (verifies checksum
+      # + SLSA provenance) instead of compiling — the static Linux asset runs as-is.
+      # install:false keeps mise from pulling the repo toolchain; `mise use -g` installs
+      # only baton. Reviews run the last *released* baton, not the PR's tree.
       - uses: jdx/mise-action@v4
         with:
+          install: false
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build baton
-        run: swift build -c release
+      - name: Install baton from the GitHub release
+        run: |
+          mise use --global "github:alexey1312/swift-baton@latest"
+          baton --version
 
       # Save a run record. continue-on-error so a fail_on exit (high finding) does not
       # abort the job before findings are published — the comments carry the signal.
@@ -86,11 +85,11 @@ jobs:
         continue-on-error: true
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: .build/release/baton review --base "origin/${BASE_REF}"
+        run: baton review --base "origin/${BASE_REF}"
 
       - name: Publish findings to the PR
         env:
           GH_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: .build/release/baton publish --run latest --gh-repo "$GH_REPO" --head-sha "$HEAD_SHA" --pr "$PR_NUMBER"
+        run: baton publish --run latest --gh-repo "$GH_REPO" --head-sha "$HEAD_SHA" --pr "$PR_NUMBER"
