@@ -103,6 +103,24 @@ struct ConfigParserTests {
         }
     }
 
+    @Test("a type-mismatched value hard-fails as malformedTOML with a recovery suggestion")
+    func malformedTOML() {
+        // A hand-edited baton.toml with a string where an Int is expected reaches the
+        // decoder catch (not the earlier invalid-kind / duplicate-name guards).
+        do {
+            _ = try ConfigParser.parse("[defaults]\nmax_concurrency = \"eight\"\n", path: "baton.toml")
+            Issue.record("expected malformedTOML")
+        } catch let error as ConfigError {
+            guard case .malformedTOML = error else {
+                Issue.record("expected malformedTOML, got \(error)")
+                return
+            }
+            #expect(error.recoverySuggestion != nil)
+        } catch {
+            Issue.record("expected ConfigError, got \(error)")
+        }
+    }
+
     @Test("unknown keys are ignored with a warning")
     func unknownKeys() throws {
         let toml = """
