@@ -183,4 +183,13 @@ struct LearnAnalysisTests {
         #expect(!allow.isAllowed("ios/.baton/skills/../../Sources/App.swift"))
         #expect(!allow.isAllowed("ios/../web/baton.toml"))
     }
+
+    @Test("porcelain -z parsing keeps non-ASCII names unquoted and captures both rename paths")
+    func porcelainZParsing() {
+        // git status --porcelain -z: " M <path>", "?? <path>", and a rename as
+        // "R  <path1>" NUL "<path2>" — never C-quoted, so café.md stays intact.
+        let raw = " M café.md\u{0}?? new dir/a.txt\u{0}R  old.md\u{0}renamed.md\u{0}"
+        let paths = LiveLearnAgent.parsePorcelainZ(Data(raw.utf8))
+        #expect(paths == ["café.md", "new dir/a.txt", "old.md", "renamed.md"])
+    }
 }

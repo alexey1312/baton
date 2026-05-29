@@ -21,6 +21,25 @@ baton learn --apply         # open/update the rolling draft PR
 baton learn --gh-repo owner/repo   # override the target repository slug
 ```
 
+## How proposals are produced and contained
+
+Unlike `review` — which runs each agent in a throwaway copy of the repository — `learn` runs the
+scope's agent CLI **in the live working tree**, with the same non-interactive flags review uses.
+This is deliberate: proposals are discovered by diffing git's dirty set before and after the run
+(never trusted from the agent's self-report). While it runs, the agent can therefore read files in
+the tree and reach the network, like any local CLI you invoke. Several guards contain it:
+
+- **Edits are git-discovered, then allowlisted.** Only changes git reports are considered, and
+  each is filtered against the scope's editable set (`baton.toml`, local skill directories, agent
+  docs). Out-of-allowlist edits are reverted after the run, so refused edits never persist.
+- **GitHub credentials are scrubbed** from the agent's environment (`GITHUB_TOKEN`/`GH_TOKEN`),
+  which the agent never needs; only `gh` itself sees them.
+- **Untrusted content is framed as data.** Skill markdown and GitHub-derived signal (finding
+  titles, file paths) enter the prompt inside a delimited untrusted block, never as instructions.
+
+Run `learn` only against a repository whose `baton.toml` and skills you trust, and prefer the
+preview (no `--apply`) when trying it out.
+
 ## The signal model
 
 For each merged PR, `learn` identifies Baton-authored threads by the `<!-- baton:finding -->`

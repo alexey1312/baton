@@ -31,6 +31,14 @@ public struct LiveLearnAgent: LearnAgentRunning {
             workdir: request.repoRoot
         )
         let result = try await executor.run(invocation, agentName: request.agent.kind.rawValue)
+        // A non-zero exit (auth/billing/model/CLI error) that wrote nothing would
+        // otherwise be reported as "no setup edits to deliver"; surface it as a
+        // failure like the review path (AgentInvoker) does.
+        guard result.status == 0 else {
+            throw AgentError.nonZeroExit(
+                agent: request.agent.kind.rawValue, status: result.status, stderrTail: result.stderrTail()
+            )
+        }
 
         let after = try Self.dirtyPaths(git)
         let changed = after.subtracting(before)
@@ -66,17 +74,34 @@ public struct LiveLearnAgent: LearnAgentRunning {
     // MARK: - Git change discovery
 
     /// The set of repo-relative paths git reports as dirty (modified, added,
-    /// deleted, or untracked).
+    /// deleted, renamed, or untracked). Uses `-z` so paths are NUL-separated and
+    /// never C-quoted, keeping non-ASCII/special names intact for the allowlist
+    /// and the revert (a quoted name would not match the real file on disk).
     private static func dirtyPaths(_ git: GitRunner) throws -> Set<String> {
-        let output = try git.capture(["status", "--porcelain", "--untracked-files=all"])
+        let output = try git.capture(["status", "--porcelain", "-z", "--untracked-files=all"])
         guard output.status == 0 else { return [] }
+        return parsePorcelainZ(output.stdout)
+    }
+
+    /// Parse `git status --porcelain -z` into the set of affected paths. Records are
+    /// NUL-separated `XY <path>`; a rename/copy record (`R`/`C`) is followed by a
+    /// bare second path field, and both paths are included so the revert and
+    /// allowlist see each side regardless of which is the source.
+    static func parsePorcelainZ(_ data: Data) -> Set<String> {
+        let fields = data.split(separator: 0x00, omittingEmptySubsequences: false)
+            .map { String(bytes: $0, encoding: .utf8) ?? "" }
         var paths: Set<String> = []
-        for line in output.text.split(separator: "\n", omittingEmptySubsequences: true) {
-            guard line.count > 3 else { continue }
-            let rest = String(line.dropFirst(3))
-            // Renames are reported as `old -> new`; attribute to the new path.
-            let path = rest.components(separatedBy: " -> ").last ?? rest
-            paths.insert(path.trimmingCharacters(in: CharacterSet(charactersIn: "\"")))
+        var i = 0
+        while i < fields.count {
+            let field = fields[i]
+            i += 1
+            guard field.count > 3 else { continue } // "XY " + at least one path char
+            let status = field.prefix(2)
+            paths.insert(String(field.dropFirst(3)))
+            if status.contains("R") || status.contains("C"), i < fields.count, !fields[i].isEmpty {
+                paths.insert(fields[i])
+                i += 1
+            }
         }
         return paths
     }

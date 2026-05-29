@@ -49,10 +49,14 @@ enum LearnGit {
     }
 
     private static func untrackedPaths(_ git: GitRunner) -> Set<String> {
-        let output = (try? git.capture(["status", "--porcelain", "--untracked-files=all"]))?.text ?? ""
+        // `-z` keeps non-ASCII names unquoted so the removeItem below matches the
+        // real file on disk (a C-quoted name would not, leaving a refused file).
+        let data = (try? git.capture(["status", "--porcelain", "-z", "--untracked-files=all"]))?.stdout ?? Data()
         var result: Set<String> = []
-        for line in output.split(separator: "\n", omittingEmptySubsequences: true) where line.hasPrefix("??") {
-            result.insert(String(line.dropFirst(3)).trimmingCharacters(in: CharacterSet(charactersIn: "\"")))
+        for field in data.split(separator: 0x00, omittingEmptySubsequences: true) {
+            let entry = String(bytes: field, encoding: .utf8) ?? ""
+            guard entry.hasPrefix("??"), entry.count > 3 else { continue }
+            result.insert(String(entry.dropFirst(3)))
         }
         return result
     }
