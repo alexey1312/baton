@@ -56,7 +56,7 @@ that slice; findings render locally or publish to a GitHub PR via `gh`.
 
 ## Workflow
 
-- Commit directly to `main`, granular Conventional Commits. Automated commits use `HK=0 git commit` (hooks validated separately).
+- Commit directly to `main`, granular Conventional Commits. Let the `hk` pre-commit hooks run (don't bypass them) — they catch `swiftformat --lint`/`swiftlint`/`actionlint` before push.
 - After a chunk: `swiftformat` → `swiftlint --strict` → `swift test` (through xcsift), commit, push, then `gh run watch <id>` to verify CI.
 - Tooling/CI scaffolding is ported from the ExFig project at `/Users/aleksei/Developer/ExFig` — compare against it when CI/tooling misbehaves.
 - baton's agent-invocation flags (`ClaudeRunner`) and the entire `learn` mode are ported from **tuist/blick** (`src/agent/`, `src/learn/agent_pass.rs`) — compare against blick when agent/learn behavior misbehaves.
