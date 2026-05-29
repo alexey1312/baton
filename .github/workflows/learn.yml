@@ -56,6 +56,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # The container runs git as a different uid than the checkout owner; without this
+      # both `git config` below and baton's GitRunner fail with "dubious ownership".
+      - name: Trust the workspace for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Install claude CLI
         uses: ./.github/actions/install-claude
 
