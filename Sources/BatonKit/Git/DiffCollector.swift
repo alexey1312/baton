@@ -19,16 +19,26 @@ public struct DiffCollector: Sendable {
         var files = DiffParser.files(nameStatus: nameStatus.stdout, patch: patch)
 
         if includeUntracked {
-            files.append(contentsOf: collectUntracked())
+            files.append(contentsOf: try collectUntracked())
         }
         return RepoDiff(base: base, files: files)
     }
 
     /// Collect untracked files and synthesize an `added` patch for each so the rest
     /// of the pipeline (routing, chunking, prompt assembly) handles them uniformly.
-    private func collectUntracked() -> [FileChange] {
-        guard let output = try? git.capture(["ls-files", "--others", "--exclude-standard", "-z"]) else {
-            return []
+    ///
+    /// Surfaces a git failure rather than silently returning none: collect() has
+    /// already validated the base and produced the tracked diff, so a failure here
+    /// is a genuine error, and swallowing it would narrow the reviewed set
+    /// invisibly while still reporting success.
+    private func collectUntracked() throws -> [FileChange] {
+        let output = try git.capture(["ls-files", "--others", "--exclude-standard", "-z"])
+        guard output.status == 0 else {
+            throw GitError.commandFailed(
+                command: "ls-files --others --exclude-standard",
+                status: output.status,
+                stderr: output.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
         }
         let paths = output.stdout
             .split(separator: 0x00, omittingEmptySubsequences: false)

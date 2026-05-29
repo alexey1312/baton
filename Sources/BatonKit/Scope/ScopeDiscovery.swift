@@ -25,7 +25,7 @@ public enum ScopeDiscovery {
         var scopes: [ScopeConfig] = []
         var warnings: [String] = []
 
-        try walk(directory: repoRoot.standardizedFileURL, relative: "") { dir, relative in
+        try walk(directory: repoRoot.standardizedFileURL, relative: "", warn: { warnings.append($0) }) { dir, relative in
             let configURL = dir.appendingPathComponent("baton.toml")
             guard FileManager.default.fileExists(atPath: configURL.path) else { return }
 
@@ -55,16 +55,26 @@ public enum ScopeDiscovery {
     private static func walk(
         directory: URL,
         relative: String,
+        warn: (String) -> Void,
         visit: (_ dir: URL, _ relative: String) throws -> Void
     ) throws {
         try visit(directory, relative)
 
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
-        let entries = (try? FileManager.default.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: Array(keys),
-            options: []
-        )) ?? []
+        let entries: [URL]
+        do {
+            entries = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: Array(keys),
+                options: []
+            )
+        } catch {
+            // An unreadable subtree is surfaced as a warning rather than silently
+            // treated as empty, which would drop any scopes nested beneath it.
+            warn("Skipped unreadable directory '\(relative.isEmpty ? "." : relative)' "
+                + "during scope discovery: \(error.localizedDescription)")
+            return
+        }
 
         for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             let name = entry.lastPathComponent
@@ -78,7 +88,7 @@ public enum ScopeDiscovery {
             // Thread the relative path through recursion so it never depends on
             // absolute-path string math (robust to /var vs /private/var resolution).
             let childRelative = relative.isEmpty ? name : "\(relative)/\(name)"
-            try walk(directory: entry, relative: childRelative, visit: visit)
+            try walk(directory: entry, relative: childRelative, warn: warn, visit: visit)
         }
     }
 
