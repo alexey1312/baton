@@ -53,14 +53,12 @@ jobs:
             asset-suffix: linux-x86_64
             artifact-name: baton-linux-x86_64
             container: swift:6.3
-          - os: windows-latest
-            platform: windows-x86_64
-            asset-suffix: windows-x86_64
-            artifact-name: baton-windows-x86_64
+          # TODO(windows): Re-add the Windows release asset once the package ships on
+          # Windows — same blocker as the CI build job (FoundationNetworking / Database
+          # module gated behind #if !os(Windows)). Until then releases are macOS + Linux.
 
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
-    continue-on-error: ${{ matrix.platform == 'windows-x86_64' }}
     env:
       VERSION: ${{ needs.version.outputs.version }}
 
@@ -73,19 +71,11 @@ jobs:
 
       - uses: actions/checkout@v6
 
-      - name: Install Swift (Windows)
-        if: matrix.platform == 'windows-x86_64'
-        uses: compnerd/gha-setup-swift@v0.4.0
-        with:
-          swift-version: swift-6.3-release
-          swift-build: 6.3-RELEASE
-
       - name: Show Swift version
         run: swift --version
 
       # Inject the tag version into the embedded version constant before building.
-      - name: Set version from tag (Unix)
-        if: matrix.platform != 'windows-x86_64'
+      - name: Set version from tag
         run: |
           FILE="Sources/BatonCLI/Baton.swift"
           if [ "${{ matrix.platform }}" = "macos" ]; then
@@ -93,13 +83,6 @@ jobs:
           else
             sed -i "s/static let version = \".*\"/static let version = \"$VERSION\"/" "$FILE"
           fi
-
-      - name: Set version from tag (Windows)
-        if: matrix.platform == 'windows-x86_64'
-        shell: pwsh
-        run: |
-          $file = "Sources/BatonCLI/Baton.swift"
-          (Get-Content $file) -replace 'static let version = ".*"', "static let version = `"$env:VERSION`"" | Set-Content $file
 
       # macOS: universal binary (arm64 + x86_64) via the multi-arch build.
       - name: Build release binary (macOS)
@@ -121,25 +104,12 @@ jobs:
         run: |
           tar czvf "baton-${VERSION}-${{ matrix.asset-suffix }}.tar.gz" -C .build/x86_64-unknown-linux-gnu/release baton
 
-      # Windows: best-effort build + zip.
-      - name: Build release binary (Windows)
-        if: matrix.platform == 'windows-x86_64'
-        run: swift build -c release
-
-      - name: Create release archive (Windows)
-        if: matrix.platform == 'windows-x86_64'
-        shell: pwsh
-        run: |
-          $bin = ".build/x86_64-unknown-windows-msvc/release/baton.exe"
-          Compress-Archive -Path $bin -DestinationPath "baton-$env:VERSION-${{ matrix.asset-suffix }}.zip"
-
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact-name }}
           path: |
             baton-${{ env.VERSION }}-${{ matrix.asset-suffix }}.tar.gz
-            baton-${{ env.VERSION }}-${{ matrix.asset-suffix }}.zip
           if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
@@ -177,7 +147,6 @@ jobs:
           files: |
             artifacts/baton-macos/baton-*-macos.tar.gz
             artifacts/baton-linux-x86_64/baton-*-linux-x86_64.tar.gz
-            artifacts/baton-windows-x86_64/baton-*-windows-x86_64.zip
 
   # ---------------------------------------------------------------------------
   # Stable releases only: regenerate CHANGELOG.md and commit it to main.
