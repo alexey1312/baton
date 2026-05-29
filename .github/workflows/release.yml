@@ -93,15 +93,19 @@ jobs:
             sed -i "s/static let version = \".*\"/static let version = \"$VERSION\"/" "$FILE"
           fi
 
-      # macOS: universal binary (arm64 + x86_64) via the multi-arch build.
+      # macOS: native arm64 build. A universal (--arch arm64 --arch x86_64) build
+      # needs a full Xcode toolchain; the mise-installed swift.org toolchain rejects
+      # the multi-arch flags ("Swift language versions ... given: []"). The runner is
+      # Apple Silicon, so the native build yields an arm64 binary. (Intel/universal is
+      # a follow-up once an Xcode with Swift 6.3 is available.)
       - name: Build release binary (macOS)
         if: matrix.platform == 'macos'
-        run: swift build -c release --arch arm64 --arch x86_64
+        run: swift build -c release
 
       - name: Create release archive (macOS)
         if: matrix.platform == 'macos'
         run: |
-          tar czvf "baton-${VERSION}-${{ matrix.asset-suffix }}.tar.gz" -C .build/apple/Products/Release baton
+          tar czvf "baton-${VERSION}-${{ matrix.asset-suffix }}.tar.gz" -C .build/release baton
 
       # Linux: statically link the Swift stdlib so the binary runs without a toolchain.
       - name: Build release binary (Linux)
