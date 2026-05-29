@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2026-05-29
+
+### Bug Fixes
+
+- **learn**: Align agent pass to blick's JSON-proposal model (fixes error_max_turns) by @alexey1312
+
+
+### Miscellaneous Tasks
+
+- Dogfood baton review on PRs + wire learn to the claude agent by @alexey1312
+
+- Accept either ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN for the claude agent by @alexey1312
+
+- Fix git 'dubious ownership' in containerized review/learn; drop redundant base fetch by @alexey1312
+
+- Run review/learn on ubuntu-latest non-root; install baton via mise github backend by @alexey1312
+
+- Grant attestations:read so mise can verify baton's SLSA provenance on install by @alexey1312
+
+
+### Other
+
+- Remove learn-signal probe by @alexey1312
+
+
+### Testing
+
+- Temporary probe to give baton learn a merged-PR signal  by @alexey1312 in [#2](https://github.com/alexey1312/swift-baton/pull/2)
+
+
 ## [0.1.0] - 2026-05-29
 
 ### Bug Fixes
