@@ -27,7 +27,7 @@ that slice; findings render locally or publish to a GitHub PR via `gh`.
 ## Conventions
 
 - Every domain error conforms to `BatonError` (LocalizedError + `recoverySuggestion`), rendered `✗ <desc>` / `→ <recovery>`.
-- Tests use **swift-testing** (`import Testing`, `@Test`, `#expect`, `#require`). `#require` requires the test be `throws` + `try`.
+- Tests use **swift-testing** (`import Testing`, `@Test`, `#expect`, `#require`). `#require` requires the test be `throws` + `try`. `#expect(throws: E.self)` matches ANY case of a multi-case enum — to assert a specific case use `do { … } catch let e as E { guard case .x = e else { Issue.record(…) } }`.
 - Use `FileManager.default` inline (not a `static let` — concurrency). Thread-safe helpers are `@unchecked Sendable` over `NSLock`; mocks accessed from async are `actor`s (`NSLock.lock()` is unavailable in async).
 - JSON: use `JSONCodec` (BatonKit, YYJSON wrapper). DOM access for parsing varied agent output.
 - Skills are vendored locally under `.claude/skills/<name>/` and wired via a local `[[skills]]` source. The resolver inlines every `*.md` under the skill dir (excluding the SKILL.md/README.md body) into the headless prompt under a per-skill byte budget: `[security].references_budget_kb`, default 1 MiB.
@@ -36,8 +36,9 @@ that slice; findings render locally or publish to a GitHub PR via `gh`.
 
 - **swift-toml**: its `.convertFromSnakeCase` is broken for camelCase props — declare explicit snake_case `CodingKeys` instead.
 - **TOML semantics**: top-level keys (e.g. `disabled_reviews`) must precede any `[table]`/`[[array]]` header or they bind to the last table.
+- **git path parsing**: always pass `-z` to `git status --porcelain` / `git diff --name-status` and split the raw `Data` on `0x00` — without `-z`, git C-quotes non-ASCII/spaced paths (`"caf\303\251.md"`) so they no longer match the file on disk.
 - **mise tasks that pipe** need `#!/usr/bin/env bash` + `set -euo pipefail` (Linux runner uses dash; a bare `swift build | xcsift` returns xcsift's exit 0 and masks failures). xcsift has no Linux build, so build/test tasks fall back to plain `swift` when it is absent.
-- **swiftlint --strict** rules hit here: `optional_data_string_conversion` (use `String(bytes:encoding:) ?? ""`, not `String(decoding:as:)`); `for_where`; `function_parameter_count` ≤5 (bundle into a request struct); `function_body_length` ≤60; `type_body_length` warning 300 (move methods to an extension file — extensions count separately); line length 120; `file_length` is 600 (test files run long).
+- **swiftlint --strict** rules hit here: `optional_data_string_conversion` (use `String(bytes:encoding:) ?? ""`, not `String(decoding:as:)`); `for_where`; `function_parameter_count` ≤5 (bundle into a request struct); `function_body_length` ≤60; `type_body_length` warning 300 (move methods to an extension file — extensions count separately); `multiple_closures_with_trailing_closure` (no trailing-closure syntax with 2+ closure args — swiftformat can introduce both this and body-length violations, so re-run swiftlint after format); line length 120; `file_length` is 600 (test files run long).
 - **swiftformat** removes `@Suite("name")` and rewrites closures to key-path shorthand — the latter can break the `#expect` macro; extract to a `let` first. `--ifdef no-indent` keeps `#if` bodies at column 0.
 
 ## Cross-platform (Windows is best-effort, but CI is green on all three)

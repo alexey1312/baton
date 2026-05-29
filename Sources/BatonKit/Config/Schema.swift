@@ -12,6 +12,7 @@ public struct BatonConfig: Codable, Equatable, Sendable {
     public var security: SecurityConfig?
     public var learn: LearnConfig?
     public var publish: PublishConfig?
+    public var render: RenderConfig?
 
     public init(
         agent: AgentConfig? = nil,
@@ -21,7 +22,8 @@ public struct BatonConfig: Codable, Equatable, Sendable {
         disabledReviews: [String]? = nil,
         security: SecurityConfig? = nil,
         learn: LearnConfig? = nil,
-        publish: PublishConfig? = nil
+        publish: PublishConfig? = nil,
+        render: RenderConfig? = nil
     ) {
         self.agent = agent
         self.defaults = defaults
@@ -31,10 +33,11 @@ public struct BatonConfig: Codable, Equatable, Sendable {
         self.security = security
         self.learn = learn
         self.publish = publish
+        self.render = render
     }
 
     enum CodingKeys: String, CodingKey {
-        case agent, defaults, skills, reviews, security, learn, publish
+        case agent, defaults, skills, reviews, security, learn, publish, render
         case disabledReviews = "disabled_reviews"
     }
 }
@@ -249,5 +252,25 @@ public struct PublishConfig: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case resolveOutdatedThreads = "resolve_outdated_threads"
+    }
+}
+
+/// The `[render]` block. Honored only at the repository-root scope: rendering a run
+/// is a repo-level presentation choice, not a per-scope cascade. Template paths are
+/// resolved relative to the configuration directory.
+public struct RenderConfig: Codable, Equatable, Sendable {
+    /// Path to a Jinja template overriding the built-in `markdown` report.
+    public var markdownTemplate: String?
+    /// Path to a Jinja template overriding the built-in `learn` rolling-PR body.
+    public var learnPrBodyTemplate: String?
+
+    public init(markdownTemplate: String? = nil, learnPrBodyTemplate: String? = nil) {
+        self.markdownTemplate = markdownTemplate
+        self.learnPrBodyTemplate = learnPrBodyTemplate
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case markdownTemplate = "markdown_template"
+        case learnPrBodyTemplate = "learn_pr_body_template"
     }
 }

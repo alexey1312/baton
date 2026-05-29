@@ -6,18 +6,22 @@ import Foundation
 enum Renderer {
     /// Render `run` in `format`. `headSHA` is required for `github-review` and
     /// `check-run`; `useColors` applies only to the `terminal` format.
+    /// A resolved report template: its source and the path it came from (for errors).
+    typealias Template = (source: String, path: String)
+
     static func render(
         run: LoadedRun,
         format: RenderFormat,
         headSHA: String?,
-        useColors: Bool = false
+        useColors: Bool = false,
+        markdownTemplate: Template? = nil
     ) throws -> String {
         if format.requiresHeadSHA, (headSHA ?? "").isEmpty {
             throw RenderError.headSHARequired(format: format.rawValue)
         }
         switch format {
         case .terminal: return terminal(run, useColors: useColors)
-        case .markdown: return markdown(run)
+        case .markdown: return try markdown(run, template: markdownTemplate)
         case .json: return try json(run)
         case .githubReview: return try githubReview(run, headSHA: headSHA ?? "")
         case .checkRun: return try checkRun(run, headSHA: headSHA ?? "")
@@ -55,25 +59,15 @@ enum Renderer {
         return lines.joined(separator: "\n")
     }
 
-    private static func markdown(_ run: LoadedRun) -> String {
-        let findings = run.results.flatMap(\.findings)
-        let failures = run.results.filter(\.taskFailed)
-        if findings.isEmpty, failures.isEmpty {
-            return "# Baton review\n\nNo findings. ✅\n"
-        }
-        var sections = ["# Baton review\n"]
-        for result in failures {
-            let detail = result.errorMessage ?? "review failed"
-            sections.append("## ⚠️ \(displayScope(result.scope)) / \(result.review)\n\n\(detail)\n")
-        }
-        for result in run.results where !result.findings.isEmpty {
-            sections.append("## \(displayScope(result.scope)) / \(result.review)\n")
-            for finding in result.findings {
-                let location = finding.line.map { "\(finding.file):\($0)" } ?? finding.file
-                sections.append("- \(finding.severity.badge) **\(finding.title)** (`\(location)`)\n\n  \(finding.body)")
-            }
-        }
-        return sections.joined(separator: "\n")
+    /// Renders the markdown report from a Jinja template — the user override when set,
+    /// otherwise the bundled default (which reproduces the prior built-in output).
+    private static func markdown(_ run: LoadedRun, template: Template?) throws -> String {
+        let context = try TemplateContext.run(run)
+        return try ReportTemplating.render(
+            template: template?.source ?? DefaultTemplates.markdown,
+            context: context,
+            path: template?.path
+        )
     }
 
     private static func json(_ run: LoadedRun) throws -> String {

@@ -114,6 +114,18 @@ public struct EffectivePublish: Equatable, Sendable {
     }
 }
 
+/// The fully resolved `[render]` values, read only from the repository-root scope.
+/// `nil` template paths mean the bundled default is used.
+public struct EffectiveRender: Equatable, Sendable {
+    public var markdownTemplate: String?
+    public var learnPrBodyTemplate: String?
+
+    public init(markdownTemplate: String? = nil, learnPrBodyTemplate: String? = nil) {
+        self.markdownTemplate = markdownTemplate
+        self.learnPrBodyTemplate = learnPrBodyTemplate
+    }
+}
+
 /// The effective configuration computed for a single scope after the cascade.
 public struct EffectiveConfig: Sendable {
     /// Repo-relative scope root (`""` for the repository root).
@@ -132,6 +144,8 @@ public struct EffectiveConfig: Sendable {
     public var learn: EffectiveLearn
     /// Resolved `[publish]` block (root-only).
     public var publish: EffectivePublish
+    /// Resolved `[render]` block (root-only).
+    public var render: EffectiveRender
     /// Provenance for `config --explain`.
     public var provenance: ConfigProvenance
 
@@ -144,6 +158,7 @@ public struct EffectiveConfig: Sendable {
         security: SecurityConfig?,
         learn: EffectiveLearn = EffectiveLearn(),
         publish: EffectivePublish = EffectivePublish(),
+        render: EffectiveRender = EffectiveRender(),
         provenance: ConfigProvenance
     ) {
         self.scopePath = scopePath
@@ -154,6 +169,7 @@ public struct EffectiveConfig: Sendable {
         self.security = security
         self.learn = learn
         self.publish = publish
+        self.render = render
         self.provenance = provenance
     }
 

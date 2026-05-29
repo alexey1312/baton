@@ -18,20 +18,15 @@ enum LearnPreview {
         return lines.joined(separator: "\n")
     }
 
-    /// The markdown body for the rolling `learn` pull request.
-    static func markdown(_ result: LearnRunResult) -> String {
-        var sections = ["## Baton learn", "", "Proposed edits to Baton's review setup based on recent review signal."]
-        for proposal in result.proposals where !proposal.edits.isEmpty {
-            sections.append("\n### `\(scopeName(proposal.scopePath))`\n")
-            sections.append(candidateSummary(proposal))
-            for edit in proposal.edits {
-                sections.append("- `\(edit.path)`" + (edit.summary.map { " — \($0)" } ?? ""))
-            }
-        }
-        if !result.proposals.contains(where: { !$0.edits.isEmpty }) {
-            sections.append("\n_No setup edits proposed this run._")
-        }
-        return sections.joined(separator: "\n")
+    /// The markdown body for the rolling `learn` pull request, rendered from a Jinja
+    /// template — the user override when set, otherwise the bundled default.
+    static func markdown(_ result: LearnRunResult, template: Renderer.Template? = nil) throws -> String {
+        let context = try TemplateContext.learn(result)
+        return try ReportTemplating.render(
+            template: template?.source ?? DefaultTemplates.learnPRBody,
+            context: context,
+            path: template?.path
+        )
     }
 
     // MARK: - Helpers

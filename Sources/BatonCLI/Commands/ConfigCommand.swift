@@ -74,6 +74,7 @@ struct ConfigCommand: AsyncParsableCommand {
         }
         lines.append(contentsOf: formatLearn(config))
         lines.append(contentsOf: formatPublish(config))
+        lines.append(contentsOf: formatRender(config))
         return lines.joined(separator: "\n")
     }
 
@@ -85,6 +86,19 @@ struct ConfigCommand: AsyncParsableCommand {
             "[publish]",
             "  resolve_outdated_threads = \(value)\(provenance("publish.resolve_outdated_threads", config))",
         ]
+    }
+
+    private func formatRender(_ config: EffectiveConfig) -> [String] {
+        // Render templates are repository-global and optional; show only when set.
+        guard config.scopePath.isEmpty else { return [] }
+        var lines: [String] = []
+        if let md = config.render.markdownTemplate {
+            lines.append("  markdown_template = \(md)\(provenance("render.markdown_template", config))")
+        }
+        if let learn = config.render.learnPrBodyTemplate {
+            lines.append("  learn_pr_body_template = \(learn)\(provenance("render.learn_pr_body_template", config))")
+        }
+        return lines.isEmpty ? [] : ["[render]"] + lines
     }
 
     private func formatLearn(_ config: EffectiveConfig) -> [String] {

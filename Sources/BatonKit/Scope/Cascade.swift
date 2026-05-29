@@ -19,6 +19,7 @@ public enum Cascade {
         let security = resolveSecurity(chain, &prov)
         let learn = resolveLearn(chain, &prov)
         let publish = resolvePublish(chain, &prov)
+        let render = resolveRender(chain, &prov)
 
         // A scope with reviews must have a resolvable agent block.
         if !reviews.isEmpty, agent == nil {
@@ -46,6 +47,7 @@ public enum Cascade {
             security: security,
             learn: learn,
             publish: publish,
+            render: render,
             provenance: prov
         )
     }
@@ -163,6 +165,23 @@ public enum Cascade {
         if let v = publish.resolveOutdatedThreads {
             result.resolveOutdatedThreads = v
             prov.record("publish.resolve_outdated_threads", .file(root.configPath))
+        }
+        return result
+    }
+
+    private static func resolveRender(
+        _ chain: [ScopeConfig],
+        _ prov: inout ConfigProvenance
+    ) -> EffectiveRender {
+        // Render templates are honored only at the repository-root scope.
+        var result = EffectiveRender()
+        guard let root = chain.first, let render = root.config.render else { return result }
+        let file = ProvenanceSource.file(root.configPath)
+        if let v = render
+            .markdownTemplate { result.markdownTemplate = v; prov.record("render.markdown_template", file) }
+        if let v = render.learnPrBodyTemplate {
+            result.learnPrBodyTemplate = v
+            prov.record("render.learn_pr_body_template", file)
         }
         return result
     }

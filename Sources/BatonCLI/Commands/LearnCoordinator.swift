@@ -53,24 +53,35 @@ enum LearnCoordinator {
             TerminalOutput.shared.err(NooraUI.warning(cacheWarning, useColors: colors))
         }
 
+        let learnTemplate = try learnTemplateOverride(plans: plans, repoRoot: options.repoRoot)
         let deliver = options.apply || deliveryConfigured(discovery)
         if deliver {
-            try await delivery(result: result, plans: plans, repo: repo, options: options)
+            try await delivery(result: result, plans: plans, repo: repo, template: learnTemplate, options: options)
         } else {
-            emitPreview(result, options: options)
+            try emitPreview(result, template: learnTemplate, options: options)
         }
     }
 
     // MARK: - Preview
 
-    private static func emitPreview(_ result: LearnRunResult, options: Options) {
-        let output = options.markdown
-            ? LearnPreview.markdown(result)
-            : LearnPreview.terminal(result, useColors: options.outputMode.useColors)
+    private static func emitPreview(_ result: LearnRunResult, template: Renderer.Template?, options: Options) throws {
+        let output: String = if options.markdown {
+            try LearnPreview.markdown(result, template: template)
+        } else {
+            LearnPreview.terminal(result, useColors: options.outputMode.useColors)
+        }
         TerminalOutput.shared.out(output)
         for warning in result.warnings {
             TerminalOutput.shared.err(NooraUI.warning(warning, useColors: options.outputMode.useColors))
         }
+    }
+
+    /// The learn PR-body template override from the root `[render].learn_pr_body_template`.
+    private static func learnTemplateOverride(plans: [LearnScopePlan], repoRoot: URL) throws -> Renderer.Template? {
+        guard let path = plans.first(where: { $0.scope.path.isEmpty })?.effective.render.learnPrBodyTemplate else {
+            return nil
+        }
+        return try ReportTemplating.userTemplate(path: path, configDir: repoRoot)
     }
 
     // MARK: - Delivery
@@ -79,6 +90,7 @@ enum LearnCoordinator {
         result: LearnRunResult,
         plans: [LearnScopePlan],
         repo: String,
+        template: Renderer.Template?,
         options: Options
     ) async throws {
         let rootLearn = plans.first { $0.scope.path.isEmpty }?.effective.learn ?? EffectiveLearn()
@@ -96,7 +108,7 @@ enum LearnCoordinator {
         )
         let report = try await GitHubLearnDelivery().deliver(LearnDeliveryRequest(
             repo: repo, branch: rootLearn.branch, base: rootLearn.base,
-            title: "Baton learn — review-setup proposals", body: LearnPreview.markdown(result),
+            title: "Baton learn — review-setup proposals", body: LearnPreview.markdown(result, template: template),
             draft: rootLearn.draft, reviewers: rootLearn.reviewers,
             teamReviewers: rootLearn.teamReviewers, labels: rootLearn.labels
         ))

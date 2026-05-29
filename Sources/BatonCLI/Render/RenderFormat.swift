@@ -13,4 +13,11 @@ enum RenderFormat: String, CaseIterable, ExpressibleByArgument {
     var requiresHeadSHA: Bool {
         self == .githubReview || self == .checkRun
     }
+
+    /// Whether a user `--template` may override this format. Only the human-facing
+    /// `markdown` report is templatable; the GitHub formats keep their required
+    /// marker, reaction affordance, and AI block built in code (Shape A).
+    var supportsTemplate: Bool {
+        self == .markdown
+    }
 }

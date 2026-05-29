@@ -102,6 +102,84 @@ struct RenderTests {
         return try (store.load(runId: nil), root)
     }
 
+    @Test("markdown default template reproduces the built-in output byte-for-byte")
+    func markdownGoldenParity() throws {
+        let (run, root) = try fixtureRun(findings: [sample])
+        defer { try? FileManager.default.removeItem(at: root) }
+        // The templated default ends every report with a single trailing newline
+        // (uniform across the empty/failed/findings branches).
+        let expected = """
+        # Baton review
+
+        ## ios / security
+
+        - 🔴 **SQL injection** (`ios/App.swift:42`)
+
+          Unsanitized input.
+
+        """
+        #expect(try Renderer.render(run: run, format: .markdown, headSHA: nil) == expected)
+    }
+
+    @Test("markdown default template reproduces the empty and failed-task output")
+    func markdownGoldenEdgeCases() throws {
+        let (empty, emptyRoot) = try fixtureRun(findings: [])
+        defer { try? FileManager.default.removeItem(at: emptyRoot) }
+        let expectedEmpty = """
+        # Baton review
+
+        No findings. ✅
+
+        """
+        #expect(try Renderer.render(run: empty, format: .markdown, headSHA: nil) == expectedEmpty)
+
+        let (failed, failedRoot) = try fixtureFailedRun()
+        defer { try? FileManager.default.removeItem(at: failedRoot) }
+        let expectedFailed = """
+        # Baton review
+
+        ## ⚠️ ios / security
+
+        Agent 'gemini' timed out after 600s
+
+        """
+        #expect(try Renderer.render(run: failed, format: .markdown, headSHA: nil) == expectedFailed)
+    }
+
+    @Test("a custom markdown template overrides the built-in default")
+    func customTemplate() throws {
+        let (run, root) = try fixtureRun(findings: [sample])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let custom: Renderer.Template = ("Report @ {{ run.head_sha }}", "custom.j2")
+        let output = try Renderer.render(run: run, format: .markdown, headSHA: nil, markdownTemplate: custom)
+        #expect(output == "Report @ sha123")
+    }
+
+    @Test("an invalid template fails with a typed, recoverable error")
+    func invalidTemplate() throws {
+        let (run, root) = try fixtureRun(findings: [sample])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let broken: Renderer.Template = ("{% for x in %}", "broken.j2")
+        do {
+            _ = try Renderer.render(run: run, format: .markdown, headSHA: nil, markdownTemplate: broken)
+            Issue.record("expected RenderError.templateInvalid")
+        } catch let error as RenderError {
+            guard case .templateInvalid = error else {
+                Issue.record("expected .templateInvalid, got \(error)")
+                return
+            }
+            #expect(error.recoverySuggestion != nil)
+        }
+    }
+
+    @Test("only the markdown format is user-templatable")
+    func templatableFormats() {
+        #expect(RenderFormat.markdown.supportsTemplate)
+        for format in RenderFormat.allCases where format != .markdown {
+            #expect(!format.supportsTemplate)
+        }
+    }
+
     @Test("a failed task surfaces its error instead of rendering as 'No findings'")
     func failedTaskSurfacesError() throws {
         let (run, root) = try fixtureFailedRun()

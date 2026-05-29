@@ -39,8 +39,8 @@ struct LearnPreviewTests {
     }
 
     @Test("markdown body lists per-scope edits for the rolling PR")
-    func markdown() {
-        let md = LearnPreview.markdown(result())
+    func markdown() throws {
+        let md = try LearnPreview.markdown(result())
         #expect(md.contains("## Baton learn"))
         #expect(md.contains("### `ios`"))
         #expect(md.contains("- `ios/baton.toml` — relax SQLi rule"))
