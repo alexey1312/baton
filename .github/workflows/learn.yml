@@ -32,6 +32,9 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Agent credentials (claude/haiku per baton.toml). Absent → learn still previews
+  # safely but cannot run the agent to deliver the rolling PR.
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
 jobs:
   learn:
@@ -50,6 +53,9 @@ jobs:
           # Full history so the rolling `learn` branch can be force-updated.
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install claude CLI
+        uses: ./.github/actions/install-claude
 
       - uses: jdx/mise-action@v4
         with:

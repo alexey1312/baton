@@ -1,0 +1,19 @@
+name: Install Claude CLI
+description: >-
+  Install Node.js and the headless `claude` CLI (@anthropic-ai/claude-code) into a
+  Debian-based job (e.g. the swift:6.3 container) so baton can invoke the claude agent.
+  Self-contained: installs its own prerequisites. Authentication is via the
+  ANTHROPIC_API_KEY environment variable supplied by the calling job.
+runs:
+  using: composite
+  steps:
+    - name: Install Node.js and the claude CLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        apt-get update
+        apt-get install -y curl ca-certificates gnupg
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+        npm install -g @anthropic-ai/claude-code
+        claude --version

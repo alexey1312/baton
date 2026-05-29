@@ -1,0 +1,92 @@
+name: Baton Review
+
+# Dogfood: baton reviews its own pull requests and posts findings as inline review
+# comments (the 👍/👎 reactions on them feed `baton learn`). Uses the repo's baton.toml
+# agent (claude/haiku), so it needs the ANTHROPIC_API_KEY secret. Without that secret
+# the review job is skipped (not failed) — a `guard` job emits a notice instead, so PRs
+# stay green until the secret is added.
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: baton-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Check for agent credentials
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ANTHROPIC_API_KEY secret is not set — skipping baton review. Add it to enable PR review."
+          fi
+
+  review:
+    name: Review changed files
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.3
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y curl git gh
+
+      # Check out the PR head by SHA (not head.ref — that is attacker-controllable).
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install claude CLI
+        uses: ./.github/actions/install-claude
+
+      - uses: jdx/mise-action@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build baton
+        run: swift build -c release
+
+      # Make the PR base branch available locally so review can diff base...head.
+      - name: Fetch PR base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+      # Save a run record. continue-on-error so a fail_on exit (high finding) does not
+      # abort the job before findings are published — the comments carry the signal.
+      - name: Review the PR diff
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: .build/release/baton review --base "origin/${BASE_REF}"
+
+      - name: Publish findings to the PR
+        env:
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: .build/release/baton publish --run latest --gh-repo "$GH_REPO" --head-sha "$HEAD_SHA" --pr "$PR_NUMBER"
