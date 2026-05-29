@@ -25,7 +25,11 @@ writes unless delivery is configured (root `[learn]` delivery fields) or explici
 The system SHALL collect usefulness signal by scanning pull requests merged within the
 effective `lookback_days` window, identifying Baton-authored review threads by the
 `<!-- baton:finding -->` marker, and reading both the 👍/👎 reactions on those comments (via
-the GitHub Reactions API) and each thread's resolution state (via GitHub GraphQL).
+the GitHub Reactions API) and each thread's resolution state (via GitHub GraphQL). The system
+SHALL determine whether a thread's resolution was produced by Baton's own automation in a
+token-independent way: a thread any of whose comments carries the `<!-- baton:auto-resolved -->`
+marker SHALL be treated as resolved by Baton automation regardless of the resolving actor's
+login, and SHALL NOT be counted as a human usefulness signal.
 
 #### Scenario: Baton threads identified by marker
 
@@ -42,6 +46,12 @@ the GitHub Reactions API) and each thread's resolution state (via GitHub GraphQL
 
 - **WHEN** a thread's resolution or outdated state was produced by Baton's own automation rather than a human actor
 - **THEN** the system SHALL NOT treat that resolution as a usefulness signal
+
+#### Scenario: Resolution carrying Baton's auto-resolve marker is not human signal
+
+- **WHEN** a review thread contains a comment carrying the `<!-- baton:auto-resolved -->` marker
+- **THEN** the system SHALL treat the thread's resolution as Baton automation
+- **AND** the system SHALL NOT count it as a usefulness signal, regardless of the resolving actor's login
 
 #### Scenario: Human-authored threads count as missing-coverage signal
 
