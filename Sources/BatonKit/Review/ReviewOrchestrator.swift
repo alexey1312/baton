@@ -70,50 +70,86 @@ public struct ReviewOrchestrator: Sendable {
 
     // MARK: - Planning
 
+    /// A resolved skill paired with the directory of the `baton.toml` that declared
+    /// it, so a relative local `source` resolves against the declaring scope even
+    /// when the skill is inherited into a descendant consuming scope.
+    private struct SkillBinding {
+        var config: SkillConfig
+        var declaringDir: URL
+    }
+
     private struct TaskSpec {
         var scopePath: String
-        var configDir: URL
         var agent: AgentConfig
         var model: String?
         var defaults: EffectiveDefaults
         var security: SecurityConfig?
         var review: ReviewConfig
-        var skills: [SkillConfig]
+        var skills: [SkillBinding]
+        /// Directory used to resolve the review's `prompt_file` (the review's
+        /// declaring scope when inherited, else the consuming scope).
+        var instructionsDir: URL
         var files: [FileChange]
     }
 
     private func buildSpecs(scopes: [ScopePlan], options: Options) -> [TaskSpec] {
         var specs: [TaskSpec] = []
         for scope in scopes {
-            let baseAgent = scope.config.agent
-            let agentConfig: AgentConfig = if let override = options.agentOverride {
-                AgentConfig(kind: override, context: baseAgent?.context)
-            } else {
-                baseAgent ?? AgentConfig(kind: .claude)
-            }
-            let model = options.modelOverride ?? (options.agentOverride == nil ? baseAgent?.model : nil)
-
             for review in scope.config.reviews {
                 if let only = options.onlyReview, review.name != only { continue }
                 let filtered = DiffRouter.filter(scope.files, glob: review.glob)
                 if filtered.isEmpty { continue }
-                let reviewSkills = (review.skills ?? []).compactMap { name in
-                    scope.config.skills.first { $0.name == name }
+
+                let (agentConfig, model) = Self.resolveAgent(
+                    scopeAgent: scope.config.agent,
+                    reviewAgent: review.agent,
+                    options: options
+                )
+                let reviewSkills: [SkillBinding] = (review.skills ?? []).compactMap { name in
+                    guard let config = scope.config.skills.first(where: { $0.name == name }) else { return nil }
+                    let dir = scope.config.skillDeclaringDirs[name] ?? scope.scopePath
+                    return SkillBinding(config: config, declaringDir: declaringURL(dir))
                 }
+                let instructionsDir = review.promptFile == nil
+                    ? scope.configDir
+                    : declaringURL(scope.config.reviewDeclaringDirs[review.name] ?? scope.scopePath)
+
                 specs.append(TaskSpec(
                     scopePath: scope.scopePath,
-                    configDir: scope.configDir,
                     agent: agentConfig,
                     model: model,
                     defaults: scope.config.defaults,
                     security: scope.config.security,
                     review: review,
                     skills: reviewSkills,
+                    instructionsDir: instructionsDir,
                     files: filtered
                 ))
             }
         }
         return specs
+    }
+
+    /// Resolve the effective agent and model for one review. Precedence: a CLI
+    /// `--agent` override (forces kind for every review) beats a per-review
+    /// `[[reviews]].agent` block, which beats the scope's `[agent]` block.
+    static func resolveAgent(
+        scopeAgent: AgentConfig?,
+        reviewAgent: AgentConfig?,
+        options: Options
+    ) -> (AgentConfig, String?) {
+        if let override = options.agentOverride {
+            let context = (reviewAgent ?? scopeAgent)?.context
+            return (AgentConfig(kind: override, context: context), options.modelOverride)
+        }
+        let base = reviewAgent ?? scopeAgent ?? AgentConfig(kind: .claude)
+        return (base, options.modelOverride ?? base.model)
+    }
+
+    /// Map a repo-relative scope directory to an absolute URL under ``repoRoot``
+    /// (mirrors how `ScopePlan.configDir` is built from the scope path).
+    private func declaringURL(_ dir: String) -> URL {
+        dir.isEmpty ? repoRoot : repoRoot.appendingPathComponent(dir, isDirectory: true)
     }
 
     // MARK: - Execution
@@ -171,9 +207,9 @@ public struct ReviewOrchestrator: Sendable {
     /// Resolve skills + instructions, chunk the diff, and run one agent pass per chunk.
     private func executeChunks(_ spec: TaskSpec) async throws -> ChunkRun {
         let resolvedSkills = try spec.skills.map {
-            try skills.resolve($0, declaringConfigDir: spec.configDir, security: spec.security)
+            try skills.resolve($0.config, declaringConfigDir: $0.declaringDir, security: spec.security)
         }
-        let instructions = try PromptBuilder.instructions(for: spec.review, configDir: spec.configDir)
+        let instructions = try PromptBuilder.instructions(for: spec.review, configDir: spec.instructionsDir)
         let context = spec.review.context ?? spec.agent.context ?? .diff
         let chunking = DiffChunker.chunks(
             files: spec.files,

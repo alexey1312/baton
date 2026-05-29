@@ -101,10 +101,15 @@ struct ReviewCommand: AsyncParsableCommand {
 
     private func preflightAgents(_ effectives: [EffectiveConfig]) throws {
         var binaries: Set<String> = []
-        for effective in effectives where !effective.reviews.isEmpty {
-            guard let kind = agent ?? effective.agent?.kind else { continue }
-            let configBinary = agent == nil ? effective.agent?.binary : nil
-            try binaries.insert(AgentToolPreflight.resolveBinary(kind: kind, configBinary: configBinary))
+        // Preflight per review, since a review may carry its own `[[reviews]].agent`.
+        // Precedence mirrors ReviewOrchestrator.resolveAgent: CLI > review > scope.
+        for effective in effectives {
+            for review in effective.reviews {
+                let reviewAgent = agent == nil ? review.agent : nil
+                guard let kind = agent ?? reviewAgent?.kind ?? effective.agent?.kind else { continue }
+                let configBinary = agent == nil ? (reviewAgent?.binary ?? effective.agent?.binary) : nil
+                try binaries.insert(AgentToolPreflight.resolveBinary(kind: kind, configBinary: configBinary))
+            }
         }
         for binary in binaries {
             try AgentToolPreflight.verify(binary: binary, agent: binary)

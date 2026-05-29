@@ -77,7 +77,14 @@ fail_on = "high"                 # optional per-review override of defaults.fail
 context = "repo"                 # optional per-review override of agent.context
 prompt  = "Focus on auth and input validation."
 # prompt_file = "./reviews/security.md"  # OR load the instruction from a file
+# agent = { kind = "codex", model = "o3" }  # optional per-review agent override
 ```
+
+A review may carry its own `agent` block (inline as above, or a `[reviews.agent]`
+sub-table) to run on a different CLI/model than the scope's `[agent]`. It replaces the
+scope agent for that review only — whole-block, like the scope-level cascade — so it must
+restate `kind`. Precedence: a CLI `--agent`/`--model` override still wins over it. A scope
+whose `[agent]` block is absent is valid as long as every review supplies its own agent.
 
 Remove an inherited review within a scope with `disabled_reviews = ["legacy-style"]`. Place
 top-level keys like `disabled_reviews` before any `[table]` header.

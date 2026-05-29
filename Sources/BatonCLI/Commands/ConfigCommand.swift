@@ -69,7 +69,12 @@ struct ConfigCommand: AsyncParsableCommand {
         if !config.reviews.isEmpty {
             lines.append("[[reviews]]")
             for review in config.reviews {
-                lines.append("  \(review.name)\(provenance("reviews.\(review.name)", config))")
+                var line = "  \(review.name)\(provenance("reviews.\(review.name)", config))"
+                if let agent = review.agent {
+                    let model = agent.model.map { "/\($0)" } ?? ""
+                    line += "  [agent: \(agent.kind.rawValue)\(model)]"
+                }
+                lines.append(line)
             }
         }
         lines.append(contentsOf: formatLearn(config))

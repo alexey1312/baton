@@ -264,4 +264,70 @@ struct CascadeTests {
             try Cascade.effective(for: c, in: [c])
         }
     }
+
+    // MARK: - Per-review agent
+
+    @Test("a review's own agent block is preserved through the cascade")
+    func perReviewAgentPreserved() throws {
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude, model: "haiku"),
+            reviews: [
+                ReviewConfig(name: "fast"),
+                ReviewConfig(name: "deep", agent: AgentConfig(kind: .codex, model: "o3")),
+            ]
+        ))
+        let eff = try Cascade.effective(for: r, in: [r])
+        #expect(eff.reviews.first { $0.name == "deep" }?.agent?.kind == .codex)
+        #expect(eff.reviews.first { $0.name == "deep" }?.agent?.model == "o3")
+        #expect(eff.reviews.first { $0.name == "fast" }?.agent == nil)
+    }
+
+    @Test("a scope without an agent block is valid when every review supplies its own")
+    func reviewAgentSatisfiesValidation() throws {
+        let c = scope("ios", BatonConfig(reviews: [
+            ReviewConfig(name: "r", agent: AgentConfig(kind: .gemini)),
+        ]))
+        let eff = try Cascade.effective(for: c, in: [c])
+        #expect(eff.agent == nil)
+        #expect(eff.reviews.first?.agent?.kind == .gemini)
+    }
+
+    @Test("a review with neither a scope nor its own agent still fails")
+    func reviewWithoutAnyAgentFails() {
+        let c = scope("ios", BatonConfig(reviews: [
+            ReviewConfig(name: "ok", agent: AgentConfig(kind: .gemini)),
+            ReviewConfig(name: "bad"),
+        ]))
+        #expect(throws: ConfigError.self) {
+            try Cascade.effective(for: c, in: [c])
+        }
+    }
+
+    // MARK: - Declaring directories
+
+    @Test("an inherited skill and review keep their declaring scope directory")
+    func inheritedDeclaringDirs() throws {
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            skills: [SkillConfig(name: "style", source: "./.claude/skills/style")],
+            reviews: [ReviewConfig(name: "r", skills: ["style"])]
+        ))
+        let c = scope("ios", BatonConfig(agent: AgentConfig(kind: .gemini)))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        // Inherited from the root scope, so its declaring dir is the root ("").
+        #expect(eff.skillDeclaringDirs["style"]?.isEmpty == true)
+        #expect(eff.reviewDeclaringDirs["r"]?.isEmpty == true)
+    }
+
+    @Test("a locally redefined skill takes the redefining scope's directory")
+    func redefinedSkillDeclaringDir() throws {
+        let r = root(BatonConfig(skills: [SkillConfig(name: "style", source: "./root-style")]))
+        let c = scope("ios", BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            skills: [SkillConfig(name: "style", source: "./ios-style")],
+            reviews: [ReviewConfig(name: "r", skills: ["style"])]
+        ))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.skillDeclaringDirs["style"] == "ios")
+    }
 }

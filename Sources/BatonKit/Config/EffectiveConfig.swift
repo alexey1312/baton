@@ -136,8 +136,17 @@ public struct EffectiveConfig: Sendable {
     public var defaults: EffectiveDefaults
     /// Resolved skills (auto-discovered prepended, closest-wins by name).
     public var skills: [SkillConfig]
+    /// Repo-relative directory of the `baton.toml` that declared each resolved
+    /// skill, keyed by skill name. A skill inherited from an ancestor scope keeps
+    /// the ancestor's directory so its relative local `source` resolves there, not
+    /// against a descendant consuming scope.
+    public var skillDeclaringDirs: [String: String]
     /// Resolved reviews (inherited, override/disable applied).
     public var reviews: [ReviewConfig]
+    /// Repo-relative directory of the `baton.toml` that declared each resolved
+    /// review, keyed by review name. Used to anchor a relative `prompt_file` to the
+    /// declaring scope rather than a descendant consuming scope.
+    public var reviewDeclaringDirs: [String: String]
     /// Root-only security policy.
     public var security: SecurityConfig?
     /// Resolved `[learn]` block (analysis cascades, delivery root-only).
@@ -159,6 +168,8 @@ public struct EffectiveConfig: Sendable {
         learn: EffectiveLearn = EffectiveLearn(),
         publish: EffectivePublish = EffectivePublish(),
         render: EffectiveRender = EffectiveRender(),
+        skillDeclaringDirs: [String: String] = [:],
+        reviewDeclaringDirs: [String: String] = [:],
         provenance: ConfigProvenance
     ) {
         self.scopePath = scopePath
@@ -170,6 +181,8 @@ public struct EffectiveConfig: Sendable {
         self.learn = learn
         self.publish = publish
         self.render = render
+        self.skillDeclaringDirs = skillDeclaringDirs
+        self.reviewDeclaringDirs = reviewDeclaringDirs
         self.provenance = provenance
     }
 

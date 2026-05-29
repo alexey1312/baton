@@ -140,6 +140,10 @@ public struct ReviewConfig: Codable, Equatable, Sendable {
     public var context: ReviewContext?
     public var prompt: String?
     public var promptFile: String?
+    /// Per-review `[agent]` override. When set, it replaces the scope's agent
+    /// block entirely (whole-block, like the scope-level cascade) for this review
+    /// only. A CLI `--agent`/`--model` override still wins over it.
+    public var agent: AgentConfig?
 
     public init(
         name: String,
@@ -148,7 +152,8 @@ public struct ReviewConfig: Codable, Equatable, Sendable {
         failOn: Severity? = nil,
         context: ReviewContext? = nil,
         prompt: String? = nil,
-        promptFile: String? = nil
+        promptFile: String? = nil,
+        agent: AgentConfig? = nil
     ) {
         self.name = name
         self.skills = skills
@@ -157,10 +162,11 @@ public struct ReviewConfig: Codable, Equatable, Sendable {
         self.context = context
         self.prompt = prompt
         self.promptFile = promptFile
+        self.agent = agent
     }
 
     enum CodingKeys: String, CodingKey {
-        case name, skills, glob, context, prompt
+        case name, skills, glob, context, prompt, agent
         case failOn = "fail_on"
         case promptFile = "prompt_file"
     }

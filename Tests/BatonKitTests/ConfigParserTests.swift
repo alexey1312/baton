@@ -62,6 +62,34 @@ struct ConfigParserTests {
         #expect(parsed.warnings.isEmpty)
     }
 
+    @Test("parses a per-review [reviews.agent] sub-table and an inline agent")
+    func parsesPerReviewAgent() throws {
+        let toml = """
+        [agent]
+        kind = "claude"
+        model = "haiku"
+
+        [[reviews]]
+        name = "deep"
+        prompt = "Deep pass."
+
+        [reviews.agent]
+        kind = "codex"
+        model = "o3"
+
+        [[reviews]]
+        name = "quick"
+        prompt = "Quick pass."
+        agent = { kind = "gemini" }
+        """
+        let parsed = try ConfigParser.parse(toml, path: "baton.toml")
+        let reviews = try #require(parsed.config.reviews)
+        #expect(reviews.first { $0.name == "deep" }?.agent?.kind == .codex)
+        #expect(reviews.first { $0.name == "deep" }?.agent?.model == "o3")
+        #expect(reviews.first { $0.name == "quick" }?.agent?.kind == .gemini)
+        #expect(parsed.warnings.isEmpty)
+    }
+
     @Test("parses the [learn] block with snake_case keys")
     func parsesLearn() throws {
         let toml = """

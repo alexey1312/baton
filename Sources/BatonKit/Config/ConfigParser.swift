@@ -27,7 +27,7 @@ public enum ConfigParser {
     ]
     private static let knownSkill: Set<String> = ["name", "source", "ref", "subpath"]
     private static let knownReview: Set<String> = [
-        "name", "skills", "glob", "fail_on", "context", "prompt", "prompt_file",
+        "name", "skills", "glob", "fail_on", "context", "prompt", "prompt_file", "agent",
     ]
     private static let knownSecurity: Set<String> = [
         "require_pinned_skills", "allowed_skill_sources", "references_budget_kb",

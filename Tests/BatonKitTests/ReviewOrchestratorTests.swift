@@ -44,6 +44,49 @@ struct ReviewOrchestratorTests {
         }
     }
 
+    /// Captures the `declaringConfigDir` each skill was resolved against. Sync over
+    /// a lock because `SkillResolving.resolve` is non-async.
+    private final class DirRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage: [String: URL] = [:]
+        func record(_ name: String, _ dir: URL) {
+            lock.lock(); defer { lock.unlock() }
+            storage[name] = dir
+        }
+
+        func dir(_ name: String) -> URL? {
+            lock.lock(); defer { lock.unlock() }
+            return storage[name]
+        }
+    }
+
+    private struct RecordingSkills: SkillResolving {
+        let recorder: DirRecorder
+        func resolve(
+            _ skill: SkillConfig,
+            declaringConfigDir: URL,
+            security _: SecurityConfig?
+        ) throws -> ResolvedSkill {
+            recorder.record(skill.name, declaringConfigDir)
+            return ResolvedSkill(name: skill.name, body: "BODY", sourceDescription: "mock")
+        }
+    }
+
+    private actor KindRecorder {
+        private(set) var kinds: [String] = []
+        func record(_ kind: String) {
+            kinds.append(kind)
+        }
+    }
+
+    private struct RecordingAgent: ReviewAgentRunning {
+        let recorder: KindRecorder
+        func run(_ request: ReviewAgentRequest) async throws -> AgentRunOutcome {
+            await recorder.record(request.agent.kind.rawValue)
+            return AgentRunOutcome(findings: [], rawOutput: "{}", warnings: [], duration: 0.01)
+        }
+    }
+
     private func file(_ path: String, bytes: Int = 20) -> FileChange {
         FileChange(
             path: path,
@@ -155,6 +198,52 @@ struct ReviewOrchestratorTests {
         let calls = await tracker.calls
         #expect(calls >= 2) // multiple chunks → multiple passes
         #expect(tasks.first?.result.findings.count == 1) // deduped
+    }
+
+    @Test("a review's own agent overrides the scope agent at runtime")
+    func perReviewAgentFlowsToRequest() async throws {
+        let recorder = KindRecorder()
+        let plan = scope(
+            "ios",
+            reviews: [
+                ReviewConfig(name: "a"), // inherits the scope agent (claude)
+                ReviewConfig(name: "b", agent: AgentConfig(kind: .codex)),
+            ],
+            files: [file("ios/x.swift")]
+        )
+        let orch = ReviewOrchestrator(
+            repoRoot: repoRoot,
+            agent: RecordingAgent(recorder: recorder),
+            skills: MockSkills()
+        )
+        _ = try await orch.run(scopes: [plan])
+        let kinds = await recorder.kinds
+        #expect(Set(kinds) == Set(["claude", "codex"]))
+    }
+
+    @Test("an inherited skill resolves against its declaring scope directory")
+    func inheritedSkillResolvesAgainstDeclaringDir() async throws {
+        let recorder = DirRecorder()
+        let repo = URL(fileURLWithPath: "/repo")
+        let config = EffectiveConfig(
+            scopePath: "ios",
+            agent: AgentConfig(kind: .claude),
+            defaults: EffectiveDefaults(),
+            skills: [SkillConfig(name: "style", source: "./style")],
+            reviews: [ReviewConfig(name: "r", skills: ["style"])],
+            security: nil,
+            skillDeclaringDirs: ["style": ""], // declared at the repo root
+            provenance: ConfigProvenance()
+        )
+        let plan = ScopePlan(
+            config: config,
+            files: [file("ios/x.swift")],
+            configDir: repo.appendingPathComponent("ios")
+        )
+        let orch = ReviewOrchestrator(repoRoot: repo, agent: MockAgent(), skills: RecordingSkills(recorder: recorder))
+        _ = try await orch.run(scopes: [plan])
+        // Resolved against the root (declaring dir), not the consuming "ios" scope.
+        #expect(recorder.dir("style") == repo)
     }
 
     @Test("static dedupe keeps first by (file, line, severity, title)")

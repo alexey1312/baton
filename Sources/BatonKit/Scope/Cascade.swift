@@ -14,15 +14,16 @@ public enum Cascade {
 
         let agent = resolveAgent(chain, &prov)
         let defaults = resolveDefaults(chain, &prov)
-        let skills = resolveSkills(chain, &prov)
-        let reviews = resolveReviews(chain, &prov)
+        let (skills, skillDirs) = resolveSkills(chain, &prov)
+        let (reviews, reviewDirs) = resolveReviews(chain, &prov)
         let security = resolveSecurity(chain, &prov)
         let learn = resolveLearn(chain, &prov)
         let publish = resolvePublish(chain, &prov)
         let render = resolveRender(chain, &prov)
 
-        // A scope with reviews must have a resolvable agent block.
-        if !reviews.isEmpty, agent == nil {
+        // Each review must have a resolvable agent: the scope's `[agent]` block or
+        // the review's own `[[reviews]].agent` override.
+        for review in reviews where agent == nil && review.agent == nil {
             throw ConfigError.noResolvableAgent(scope: displayPath(target.path))
         }
 
@@ -48,6 +49,8 @@ public enum Cascade {
             learn: learn,
             publish: publish,
             render: render,
+            skillDeclaringDirs: skillDirs,
+            reviewDeclaringDirs: reviewDirs,
             provenance: prov
         )
     }
@@ -92,56 +95,71 @@ public enum Cascade {
         return result
     }
 
-    private static func resolveSkills(_ chain: [ScopeConfig], _ prov: inout ConfigProvenance) -> [SkillConfig] {
+    /// Resolve skills closest-wins, tracking the repo-relative directory of the
+    /// scope that declared each (its `baton.toml` lives at `scope.path`), so an
+    /// inherited skill's relative local `source` anchors to where it was declared.
+    private static func resolveSkills(
+        _ chain: [ScopeConfig],
+        _ prov: inout ConfigProvenance
+    ) -> ([SkillConfig], [String: String]) {
         var order: [String] = []
         var byName: [String: SkillConfig] = [:]
         var sources: [String: ProvenanceSource] = [:]
+        var dirs: [String: String] = [:]
 
-        func upsert(_ skill: SkillConfig, _ source: ProvenanceSource) {
+        func upsert(_ skill: SkillConfig, _ source: ProvenanceSource, dir: String) {
             if byName[skill.name] == nil { order.append(skill.name) }
             byName[skill.name] = skill
             sources[skill.name] = source
+            dirs[skill.name] = dir
         }
 
         for scope in chain {
             // Auto-discovered skills are prepended so explicit entries override them.
             for skill in scope.autoSkills {
-                upsert(skill, .autoDiscovered(scope.path.isEmpty ? ".baton/skills" : "\(scope.path)/.baton/skills"))
+                let label = scope.path.isEmpty ? ".baton/skills" : "\(scope.path)/.baton/skills"
+                upsert(skill, .autoDiscovered(label), dir: scope.path)
             }
             for skill in scope.config.skills ?? [] {
-                upsert(skill, .file(scope.configPath))
+                upsert(skill, .file(scope.configPath), dir: scope.path)
             }
         }
 
         for (name, source) in sources {
             prov.record("skills.\(name)", source)
         }
-        return order.compactMap { byName[$0] }
+        return (order.compactMap { byName[$0] }, dirs)
     }
 
-    private static func resolveReviews(_ chain: [ScopeConfig], _ prov: inout ConfigProvenance) -> [ReviewConfig] {
+    private static func resolveReviews(
+        _ chain: [ScopeConfig],
+        _ prov: inout ConfigProvenance
+    ) -> ([ReviewConfig], [String: String]) {
         var order: [String] = []
         var byName: [String: ReviewConfig] = [:]
         var sources: [String: ProvenanceSource] = [:]
+        var dirs: [String: String] = [:]
 
         for scope in chain {
             // Disable inherited reviews first, so a scope may disable then redefine.
             for name in scope.config.disabledReviews ?? [] {
                 byName[name] = nil
                 sources[name] = nil
+                dirs[name] = nil
                 order.removeAll { $0 == name }
             }
             for review in scope.config.reviews ?? [] {
                 if byName[review.name] == nil { order.append(review.name) }
                 byName[review.name] = review
                 sources[review.name] = .file(scope.configPath)
+                dirs[review.name] = scope.path
             }
         }
 
         for (name, source) in sources {
             prov.record("reviews.\(name)", source)
         }
-        return order.compactMap { byName[$0] }
+        return (order.compactMap { byName[$0] }, dirs)
     }
 
     private static func resolveSecurity(
