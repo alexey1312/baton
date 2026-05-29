@@ -74,7 +74,9 @@ public enum Cascade {
                 result.maxConcurrency = v
                 prov.record("defaults.max_concurrency", file)
             }
-            if let v = d.diffBudget { result.diffBudget = v; prov.record("defaults.diff_budget", file) }
+            // A non-positive budget would mark every hunk truncated; treat it as
+            // unconfigured so the inherited/default budget stands (cf. max_concurrency).
+            if let v = d.diffBudget, v > 0 { result.diffBudget = v; prov.record("defaults.diff_budget", file) }
             if let v = d.chunkStrategy {
                 result.chunkStrategy = v
                 prov.record("defaults.chunk_strategy", file)

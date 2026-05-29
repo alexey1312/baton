@@ -100,13 +100,25 @@ public enum DiffParser {
         return Int(number) ?? 0
     }
 
+    /// Whether a file block is a binary diff. Detection is anchored to git's own
+    /// metadata lines — which appear unprefixed — so a *content* line that happens
+    /// to contain the literal phrase (it would carry a `+`/`-`/space prefix) does
+    /// not false-positive a text diff into binary.
+    static func isBinaryBlock(_ block: String) -> Bool {
+        for line in block.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("Binary files "), line.hasSuffix(" differ") { return true }
+            if line == "GIT binary patch" { return true }
+        }
+        return false
+    }
+
     /// Build `FileChange` values from a name-status listing and the full patch text.
     public static func files(nameStatus data: Data, patch: String) -> [FileChange] {
         let entries = parseNameStatus(data)
         let blocks = splitIntoBlocks(patch)
         return entries.enumerated().map { index, entry in
             let block = index < blocks.count ? blocks[index] : ""
-            let isBinary = block.contains("Binary files ") || block.contains("GIT binary patch")
+            let isBinary = isBinaryBlock(block)
             return FileChange(
                 path: entry.path,
                 oldPath: entry.oldPath,

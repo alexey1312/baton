@@ -53,9 +53,23 @@ public struct DiffCollector: Sendable {
             return FileChange(path: path, changeKind: .added, isBinary: true, hunks: [], patch: patch)
         }
         let content = String(bytes: data, encoding: .utf8) ?? ""
-        let lines = content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let plus = lines.map { "+\($0)" }
+        // An empty new file has no hunk — git emits only the header.
+        guard !content.isEmpty else {
+            let patch = """
+            diff --git a/\(path) b/\(path)
+            new file mode 100644
+            """
+            return FileChange(path: path, changeKind: .added, hunks: [], patch: patch)
+        }
+        // A trailing newline yields a spurious empty final element from `split`; git
+        // counts only real lines. Without a trailing newline git appends the
+        // `\ No newline at end of file` marker after the last added line.
+        let endsWithNewline = content.hasSuffix("\n")
+        var lines = content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        if endsWithNewline { lines.removeLast() }
+        var plus = lines.map { "+\($0)" }
         let header = "@@ -0,0 +1,\(lines.count) @@"
+        if !endsWithNewline { plus.append("\\ No newline at end of file") }
         let patch = """
         diff --git a/\(path) b/\(path)
         new file mode 100644

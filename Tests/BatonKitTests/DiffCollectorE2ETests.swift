@@ -45,8 +45,10 @@ struct DiffCollectorE2ETests {
 
             let added = try #require(byPath["b.txt"])
             #expect(added.changeKind == .added)
-            #expect(!added.hunks.isEmpty)
-            #expect(added.patch.contains("@@ -0,0"))
+            // "new\n" is one added line: exact count, single `+` line, no spurious trailing `+`.
+            #expect(added.patch.contains("@@ -0,0 +1,1 @@"))
+            #expect(added.hunks.first?.lines == ["+new"])
+            #expect(!added.patch.hasSuffix("\n+"))
         }
     }
 

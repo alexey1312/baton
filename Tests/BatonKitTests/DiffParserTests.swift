@@ -78,4 +78,23 @@ struct DiffParserTests {
         #expect(files[0].hunks.isEmpty)
         #expect(files[0].changeKind == .added)
     }
+
+    @Test("a text diff whose content mentions 'Binary files … differ' is not misclassified binary")
+    func binaryFalsePositive() {
+        let data = Data("M\u{0}docs/git.md\u{0}".utf8)
+        // The phrase appears on a `+` content line, not as git's unprefixed marker.
+        let patch = """
+        diff --git a/docs/git.md b/docs/git.md
+        --- a/docs/git.md
+        +++ b/docs/git.md
+        @@ -1,2 +1,3 @@
+         intro
+        +Binary files /dev/null and b/x differ
+        +explained
+        """
+        let files = DiffParser.files(nameStatus: data, patch: patch)
+        #expect(files.count == 1)
+        #expect(files[0].isBinary == false)
+        #expect(!files[0].hunks.isEmpty)
+    }
 }
