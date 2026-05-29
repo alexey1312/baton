@@ -35,6 +35,7 @@ public enum ConfigParser {
     private static let knownLearn: Set<String> = [
         "branch", "base", "reviewers", "team_reviewers", "labels", "draft",
         "lookback_days", "min_signal", "enabled", "count_author_reactions",
+        "agent", "model",
     ]
 
     /// Parse `baton.toml` text from the file at `path`.

@@ -220,6 +220,8 @@ public enum Cascade {
                 result.countAuthorReactions = v
                 prov.record("learn.count_author_reactions", file)
             }
+            if let v = learn.agent { result.agent = v; prov.record("learn.agent", file) }
+            if let v = learn.model { result.model = v; prov.record("learn.model", file) }
         }
         // Clamp to sane minimums: a 0/negative min_signal would make every scope
         // pass volume gating, and a 0/negative lookback would read an empty window.

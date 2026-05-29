@@ -29,3 +29,5 @@ Review the added (`+`) lines in the diff for Swift Concurrency correctness, usin
 [learn]
 # Solo maintainer reviews their own PRs, so their 👍/👎 are legitimate signal.
 count_author_reactions = true
+# learn reasons over accumulated signal — give it a smarter model than per-PR review (haiku).
+model = "sonnet"

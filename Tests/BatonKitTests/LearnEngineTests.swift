@@ -193,4 +193,92 @@ struct LearnEngineTests {
         #expect(result.proposals.isEmpty)
         #expect(await agent.requests.isEmpty)
     }
+
+    // MARK: - Agent resolution
+
+    @Test("resolveAgent: scope agent is the default when nothing overrides it")
+    func resolveAgentDefaultsToScope() {
+        let resolved = LearnEngine.resolveAgent(
+            scopeAgent: AgentConfig(kind: .claude, model: "haiku"),
+            learnAgent: nil, learnModel: nil, agentOverride: nil, modelOverride: nil
+        )
+        #expect(resolved.kind == .claude)
+        #expect(resolved.model == "haiku") // carried over: kind matches
+    }
+
+    @Test("resolveAgent: [learn] block wins over the scope agent")
+    func resolveAgentLearnBlockWins() {
+        let resolved = LearnEngine.resolveAgent(
+            scopeAgent: AgentConfig(kind: .claude, model: "haiku"),
+            learnAgent: .codex, learnModel: "opus", agentOverride: nil, modelOverride: nil
+        )
+        #expect(resolved.kind == .codex)
+        #expect(resolved.model == "opus")
+    }
+
+    @Test("resolveAgent: CLI override wins over the [learn] block")
+    func resolveAgentCLIWins() {
+        let resolved = LearnEngine.resolveAgent(
+            scopeAgent: AgentConfig(kind: .claude, model: "haiku"),
+            learnAgent: .codex, learnModel: "opus", agentOverride: .gemini, modelOverride: "g-pro"
+        )
+        #expect(resolved.kind == .gemini)
+        #expect(resolved.model == "g-pro")
+    }
+
+    @Test("resolveAgent: scope model carries over only when the resolved kind matches")
+    func resolveAgentModelCarryoverGuard() {
+        // Differing kind ([learn].agent) → scope's claude model is NOT carried to codex.
+        let differing = LearnEngine.resolveAgent(
+            scopeAgent: AgentConfig(kind: .claude, model: "haiku"),
+            learnAgent: .codex, learnModel: nil, agentOverride: nil, modelOverride: nil
+        )
+        #expect(differing.kind == .codex)
+        #expect(differing.model == nil)
+
+        // Same kind with no model override → scope's model carries over.
+        let matching = LearnEngine.resolveAgent(
+            scopeAgent: AgentConfig(kind: .claude, model: "haiku"),
+            learnAgent: .claude, learnModel: nil, agentOverride: nil, modelOverride: nil
+        )
+        #expect(matching.kind == .claude)
+        #expect(matching.model == "haiku")
+    }
+
+    @Test("resolveAgent: matching kind preserves the scope's other agent fields")
+    func resolveAgentPreservesScopeFields() {
+        let resolved = LearnEngine.resolveAgent(
+            scopeAgent: AgentConfig(kind: .claude, model: "haiku", binary: "/bin/claude", sandbox: false),
+            learnAgent: nil, learnModel: "sonnet", agentOverride: nil, modelOverride: nil
+        )
+        #expect(resolved.kind == .claude)
+        #expect(resolved.model == "sonnet") // [learn].model applied
+        #expect(resolved.binary == "/bin/claude") // carried from scope
+        #expect(resolved.sandbox == false) // carried from scope
+    }
+
+    @Test("resolveAgent: defaults to claude when no agent is configured anywhere")
+    func resolveAgentDefaultsToClaude() {
+        let resolved = LearnEngine.resolveAgent(
+            scopeAgent: nil, learnAgent: nil, learnModel: nil, agentOverride: nil, modelOverride: nil
+        )
+        #expect(resolved.kind == .claude)
+        #expect(resolved.model == nil)
+    }
+
+    @Test("the [learn] model override flows into the agent request")
+    func learnModelOverrideFlowsToRequest() async throws {
+        let agent = MockLearnAgent { _ in [ProposedEdit(path: "ios/baton.toml", newContents: "x")] }
+        let engine = LearnEngine(agent: agent, agentOverride: .codex, modelOverride: "opus")
+        let learn = EffectiveLearn(minSignal: 1, model: "sonnet") // CLI override must win
+        _ = try await engine.run(
+            plans: [plan("ios", learn: learn)],
+            signals: [batonThread(file: "ios/a.swift")],
+            repoRoot: repoRoot
+        )
+        let request = await agent.requests.first
+        #expect(request?.agent.kind == .codex)
+        #expect(request?.agent.model == "opus")
+        #expect(request?.model == "opus")
+    }
 }

@@ -216,6 +216,11 @@ public struct LearnConfig: Codable, Equatable, Sendable {
     /// usefulness signal. Defaults off (a self-reaction cannot manufacture signal),
     /// but a solo maintainer who reviews their own PRs can opt in.
     public var countAuthorReactions: Bool?
+    /// Agent kind for the learning pass, overriding the scope's `[agent].kind`.
+    /// Lets `learn` run a smarter (pricier) model than per-PR review.
+    public var agent: AgentKind?
+    /// Model for the learning pass, overriding the scope's `[agent].model`.
+    public var model: String?
 
     public init(
         branch: String? = nil,
@@ -227,7 +232,9 @@ public struct LearnConfig: Codable, Equatable, Sendable {
         lookbackDays: Int? = nil,
         minSignal: Int? = nil,
         enabled: Bool? = nil,
-        countAuthorReactions: Bool? = nil
+        countAuthorReactions: Bool? = nil,
+        agent: AgentKind? = nil,
+        model: String? = nil
     ) {
         self.branch = branch
         self.base = base
@@ -239,6 +246,8 @@ public struct LearnConfig: Codable, Equatable, Sendable {
         self.minSignal = minSignal
         self.enabled = enabled
         self.countAuthorReactions = countAuthorReactions
+        self.agent = agent
+        self.model = model
     }
 
     enum CodingKeys: String, CodingKey {
@@ -248,6 +257,7 @@ public struct LearnConfig: Codable, Equatable, Sendable {
         case minSignal = "min_signal"
         case enabled
         case countAuthorReactions = "count_author_reactions"
+        case agent, model
     }
 }
 

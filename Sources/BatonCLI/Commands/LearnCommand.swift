@@ -20,6 +20,12 @@ struct LearnCommand: AsyncParsableCommand {
     @Flag(help: "Emit the proposal as markdown (the rolling PR body) instead of terminal text.")
     var markdown = false
 
+    @Option(help: "Override the agent kind for the learning pass (\(AgentKind.listForHelp)).")
+    var agent: AgentKind?
+
+    @Option(help: "Override the agent model for the learning pass.")
+    var model: String?
+
     @Option(name: .customLong("gh-repo"), help: "Target repository slug (owner/repo).")
     var ghRepo: String?
 
@@ -34,6 +40,8 @@ struct LearnCommand: AsyncParsableCommand {
                 ghRepo: ghRepo,
                 apply: apply,
                 markdown: markdown,
+                agent: agent,
+                model: model,
                 outputMode: global.outputMode
             ))
         }

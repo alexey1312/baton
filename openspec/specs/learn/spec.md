@@ -186,6 +186,33 @@ The system SHALL run the learning analysis for each scope using that scope's eff
 - **WHEN** the agent proposes edits for a scope
 - **THEN** the system SHALL accept only edits to that scope's own `baton.toml`, local skills, and agent docs
 
+### Requirement: Learn Agent And Model Override Precedence
+
+The system SHALL allow the learning pass to use an agent kind and model distinct from the
+per-PR review agent, so that `learn` can reason over accumulated signal with a smarter model.
+The effective agent kind and model SHALL be resolved with this precedence: a CLI `--agent`/
+`--model` override SHALL win over the `[learn].agent`/`[learn].model` analysis fields, which
+SHALL win over the scope's `[agent]` block. The `[learn].agent` and `[learn].model` fields
+SHALL cascade closest-wins like the other `[learn]` analysis fields. When the resolved agent
+kind differs from the scope's `[agent]` kind, the system SHALL NOT carry the scope's model over
+to the differing agent; the scope's model SHALL apply only when the resolved kind matches the
+scope's kind.
+
+#### Scenario: Learn block overrides the scope agent
+
+- **WHEN** a scope's `[agent]` selects one kind and model and the effective `[learn].agent`/`[learn].model` select another
+- **THEN** the system SHALL drive that scope's learning pass with the `[learn]` agent kind and model
+
+#### Scenario: CLI override wins over the learn block
+
+- **WHEN** the user passes `--agent` and/or `--model` to `learn` while `[learn].agent`/`[learn].model` are also set
+- **THEN** the system SHALL drive the learning pass with the CLI-supplied agent kind and/or model
+
+#### Scenario: Scope agent is the default when no override is set
+
+- **WHEN** neither a CLI override nor `[learn].agent`/`[learn].model` is set for a scope
+- **THEN** the system SHALL drive the learning pass with the scope's effective `[agent]` kind and model
+
 ### Requirement: Missing-Coverage Proposals From Human Threads
 
 The system SHALL feed each scope's human-authored missing-coverage signal into that scope's

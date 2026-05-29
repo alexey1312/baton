@@ -104,6 +104,8 @@ struct ConfigParserTests {
         min_signal = 5
         enabled = false
         count_author_reactions = true
+        agent = "codex"
+        model = "opus"
         """
         let parsed = try ConfigParser.parse(toml, path: "baton.toml")
         let learn = parsed.config.learn
@@ -117,6 +119,8 @@ struct ConfigParserTests {
         #expect(learn?.minSignal == 5)
         #expect(learn?.enabled == false)
         #expect(learn?.countAuthorReactions == true)
+        #expect(learn?.agent == .codex)
+        #expect(learn?.model == "opus")
         #expect(parsed.warnings.isEmpty)
     }
 

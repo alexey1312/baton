@@ -12,6 +12,9 @@ enum LearnCoordinator {
         var ghRepo: String?
         var apply: Bool
         var markdown: Bool
+        /// CLI `--agent`/`--model` overrides for the learning pass (win over `[learn]`).
+        var agent: AgentKind?
+        var model: String?
         var outputMode: OutputMode
     }
 
@@ -44,7 +47,11 @@ enum LearnCoordinator {
             git: GitRunner(repoRoot: options.repoRoot),
             referencesBudgetBytes: referencesBudget
         )
-        let engine = LearnEngine(agent: LiveLearnAgent(skills: resolver))
+        let engine = LearnEngine(
+            agent: LiveLearnAgent(skills: resolver),
+            agentOverride: options.agent,
+            modelOverride: options.model
+        )
         let result = try await engine.run(plans: plans, signals: signals, repoRoot: options.repoRoot)
 
         // The agent returns proposed edits as structured data — nothing is written

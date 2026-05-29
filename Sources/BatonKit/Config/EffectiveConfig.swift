@@ -75,6 +75,10 @@ public struct EffectiveLearn: Equatable, Sendable {
     public var enabled: Bool
     /// Whether the pull request author's own reactions count toward signal.
     public var countAuthorReactions: Bool
+    /// Agent override for the learning pass (nil = use the scope's `[agent]`).
+    public var agent: AgentKind?
+    /// Model override for the learning pass (nil = inherit per resolution rules).
+    public var model: String?
     // Delivery (root-only).
     public var branch: String
     public var base: String?
@@ -88,6 +92,8 @@ public struct EffectiveLearn: Equatable, Sendable {
         minSignal: Int = ConfigDefaults.learnMinSignal,
         enabled: Bool = ConfigDefaults.learnEnabled,
         countAuthorReactions: Bool = ConfigDefaults.learnCountAuthorReactions,
+        agent: AgentKind? = nil,
+        model: String? = nil,
         branch: String = ConfigDefaults.learnBranch,
         base: String? = nil,
         reviewers: [String] = [],
@@ -99,6 +105,8 @@ public struct EffectiveLearn: Equatable, Sendable {
         self.minSignal = minSignal
         self.enabled = enabled
         self.countAuthorReactions = countAuthorReactions
+        self.agent = agent
+        self.model = model
         self.branch = branch
         self.base = base
         self.reviewers = reviewers

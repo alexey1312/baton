@@ -114,6 +114,13 @@ struct ConfigCommand: AsyncParsableCommand {
         lines.append("  min_signal = \(learn.minSignal)\(provenance("learn.min_signal", config))")
         let car = learn.countAuthorReactions
         lines.append("  count_author_reactions = \(car)\(provenance("learn.count_author_reactions", config))")
+        // Agent/model overrides are optional; show them only when set.
+        if let agent = learn.agent {
+            lines.append("  agent = \(agent.rawValue)\(provenance("learn.agent", config))")
+        }
+        if let model = learn.model {
+            lines.append("  model = \(model)\(provenance("learn.model", config))")
+        }
         // Delivery fields are repository-global; show them on the root scope only.
         guard config.scopePath.isEmpty else { return lines }
         lines.append("  branch = \(learn.branch)\(provenance("learn.branch", config))")

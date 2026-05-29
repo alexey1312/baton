@@ -89,9 +89,19 @@ public struct LearnRunResult: Sendable {
 /// re-run idempotent.
 public struct LearnEngine: Sendable {
     private let agent: any LearnAgentRunning
+    /// CLI `--agent` override; wins over `[learn].agent` and the scope `[agent]`.
+    private let agentOverride: AgentKind?
+    /// CLI `--model` override; wins over `[learn].model` and the scope `[agent]`.
+    private let modelOverride: String?
 
-    public init(agent: any LearnAgentRunning) {
+    public init(
+        agent: any LearnAgentRunning,
+        agentOverride: AgentKind? = nil,
+        modelOverride: String? = nil
+    ) {
         self.agent = agent
+        self.agentOverride = agentOverride
+        self.modelOverride = modelOverride
     }
 
     /// Run the learning pass over `plans` against `signals`, in `repoRoot`.
@@ -176,7 +186,13 @@ public struct LearnEngine: Sendable {
         missingCoverage: [ReviewThreadSignal]
     ) -> LearnAgentRequest {
         let effective = plan.effective
-        let agentConfig = effective.agent ?? AgentConfig(kind: .claude)
+        let agentConfig = Self.resolveAgent(
+            scopeAgent: effective.agent,
+            learnAgent: effective.learn.agent,
+            learnModel: effective.learn.model,
+            agentOverride: agentOverride,
+            modelOverride: modelOverride
+        )
         return LearnAgentRequest(
             scopePath: plan.scope.path,
             configDir: plan.configDir,
@@ -191,5 +207,28 @@ public struct LearnEngine: Sendable {
             bucketCounts: SignalAnalysis.bucketCounts(threads),
             missingCoverage: missingCoverage
         )
+    }
+
+    /// Resolve the agent for a scope's learning pass. Precedence (mirrors
+    /// ``ReviewOrchestrator/resolveAgent(scopeAgent:reviewAgent:options:)``): a CLI
+    /// `--agent`/`--model` override beats the `[learn]` block, which beats the
+    /// scope's `[agent]` block. The scope's model carries over only when the
+    /// resolved kind matches the scope's kind (a claude model is meaningless for
+    /// codex); otherwise non-kind fields (binary/context/sandbox) start fresh.
+    static func resolveAgent(
+        scopeAgent: AgentConfig?,
+        learnAgent: AgentKind?,
+        learnModel: String?,
+        agentOverride: AgentKind?,
+        modelOverride: String?
+    ) -> AgentConfig {
+        let kind = agentOverride ?? learnAgent ?? scopeAgent?.kind ?? .claude
+        let matchesScope = kind == scopeAgent?.kind
+        let model = modelOverride ?? learnModel ?? (matchesScope ? scopeAgent?.model : nil)
+        if matchesScope, var base = scopeAgent {
+            base.model = model
+            return base
+        }
+        return AgentConfig(kind: kind, model: model)
     }
 }

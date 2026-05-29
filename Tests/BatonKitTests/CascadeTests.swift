@@ -348,3 +348,27 @@ struct CascadeTests {
         #expect(eff.skillDeclaringDirs["style"] == "ios")
     }
 }
+
+// Extensions count separately toward type_body_length, keeping the suite under the cap.
+extension CascadeTests {
+    @Test("learn agent/model cascade closest-wins and default to nil")
+    func learnAgentModelCascade() throws {
+        // Default: unset anywhere → nil (fall back to the scope's [agent]).
+        let plain = scope("ios", BatonConfig(agent: AgentConfig(kind: .claude)))
+        let eff0 = try Cascade.effective(for: plain, in: [plain]).learn
+        #expect(eff0.agent == nil)
+        #expect(eff0.model == nil)
+
+        // Child override wins over root, field-by-field.
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            learn: LearnConfig(agent: .codex, model: "opus")
+        ))
+        let c = scope("ios", BatonConfig(learn: LearnConfig(model: "sonnet")))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.learn.agent == .codex) // inherited from root
+        #expect(eff.learn.model == "sonnet") // child override
+        #expect(eff.provenance.source(for: "learn.agent") == .file("baton.toml"))
+        #expect(eff.provenance.source(for: "learn.model") == .file("ios/baton.toml"))
+    }
+}

@@ -45,6 +45,12 @@ struct CommandParsingTests {
         #expect(cmd.markdown)
         #expect(cmd.ghRepo == "o/r")
         #expect(cmd.repo == "/tmp/x")
+        #expect(cmd.agent == nil)
+        #expect(cmd.model == nil)
+
+        let withAgent = try LearnCommand.parse(["--agent", "codex", "--model", "opus"])
+        #expect(withAgent.agent == .codex)
+        #expect(withAgent.model == "opus")
     }
 
     @Test("an unknown subcommand is rejected")
