@@ -26,6 +26,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # mise's github backend verifies the release's SLSA attestations on install.
+  attestations: read
 
 concurrency:
   group: baton-learn
