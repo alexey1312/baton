@@ -112,13 +112,21 @@ public struct ReviewThreadSignal: Sendable, Equatable {
         self.finding = finding
     }
 
-    /// Net reaction weight (+1 per 👍, −1 per 👎), excluding the pull request
-    /// author's own reactions so a self-reaction cannot manufacture signal.
-    public var netReactionWeight: Int {
+    /// Net reaction weight (+1 per 👍, −1 per 👎). When `countAuthorReactions` is
+    /// false (the default), the pull request author's own reactions are excluded so
+    /// a self-reaction cannot manufacture signal; when true (e.g. a solo maintainer
+    /// reviewing their own PRs), they are counted.
+    public func netReactionWeight(countAuthorReactions: Bool) -> Int {
         reactions.reduce(0) { total, reaction in
-            guard reaction.author != prAuthor else { return total }
+            guard countAuthorReactions || reaction.author != prAuthor else { return total }
             return total + (reaction.kind == .thumbsUp ? 1 : -1)
         }
+    }
+
+    /// Net reaction weight excluding the PR author's own reactions (the default
+    /// anti-gaming behavior). Delegates to ``netReactionWeight(countAuthorReactions:)``.
+    public var netReactionWeight: Int {
+        netReactionWeight(countAuthorReactions: false)
     }
 }
 

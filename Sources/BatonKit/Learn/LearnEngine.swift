@@ -111,7 +111,10 @@ public struct LearnEngine: Sendable {
                 continue
             }
             let threads = attributed[plan.scope.path] ?? []
-            result.allCandidates += SignalAnalysis.candidates(threads)
+            result.allCandidates += SignalAnalysis.candidates(
+                threads,
+                countAuthorReactions: plan.effective.learn.countAuthorReactions
+            )
             try await process(plan: plan, threads: threads, repoRoot: repoRoot, into: &result)
         }
         return result
@@ -140,7 +143,9 @@ public struct LearnEngine: Sendable {
             return
         }
 
-        let candidates = meetsThreshold ? SignalAnalysis.candidates(threads) : []
+        let candidates = meetsThreshold
+            ? SignalAnalysis.candidates(threads, countAuthorReactions: plan.effective.learn.countAuthorReactions)
+            : []
         let outcome = try await agent.proposeEdits(makeRequest(
             plan: plan, repoRoot: repoRoot,
             candidates: candidates, threads: threads, missingCoverage: humanThreads

@@ -98,13 +98,39 @@ struct LearnAnalysisTests {
         #expect(SignalAnalysis.candidates([t]).first?.direction == .relax)
     }
 
-    @Test("pull request author's own reaction is not counted")
+    @Test("pull request author's own reaction is excluded by default, counted when opted in")
     func authorSelfReaction() {
         let selfUp = Reaction(kind: .thumbsUp, author: "author")
         let t = thread(prAuthor: "author", file: "a", resolution: .unresolved, reactions: [selfUp, down])
-        // author's +1 excluded; only bob's -1 counts → net -1, plus unresolved -1.
-        #expect(t.netReactionWeight == -1)
+        // Default (false): author's +1 excluded; only bob's -1 → net -1, plus unresolved -1 = -2.
+        #expect(t.netReactionWeight(countAuthorReactions: false) == -1)
+        #expect(t.netReactionWeight == -1) // no-arg property delegates to false
         #expect(SignalAnalysis.weight(t) == -2)
+        #expect(SignalAnalysis.weight(t, countAuthorReactions: false) == -2)
+        // Opted in (true): author's +1 and bob's -1 → net 0, plus unresolved -1 = -1.
+        #expect(t.netReactionWeight(countAuthorReactions: true) == 0)
+        #expect(SignalAnalysis.weight(t, countAuthorReactions: true) == -1)
+    }
+
+    @Test("non-author reaction counts regardless of the count_author_reactions flag")
+    func nonAuthorReactionAlwaysCounts() {
+        let t = thread(prAuthor: "author", file: "a", resolution: .unresolved, reactions: [down])
+        #expect(t.netReactionWeight(countAuthorReactions: false) == -1)
+        #expect(t.netReactionWeight(countAuthorReactions: true) == -1)
+    }
+
+    @Test("candidates honor count_author_reactions for the author's own reaction")
+    func candidatesHonorAuthorFlag() {
+        let authorDown = Reaction(kind: .thumbsDown, author: "author")
+        // Resolved (+1 resolution) with only the author's 👎.
+        let t = thread(prAuthor: "author", file: "a", resolution: .resolved, reactions: [authorDown])
+        // Default: author 👎 excluded → weight +1 → reinforce.
+        #expect(SignalAnalysis.candidates([t]).first?.direction == .reinforce)
+        // Opted in: author 👎 counts → +1 - 1 = 0 → reinforce; add a second 👎 to flip to relax.
+        let t2 = thread(prAuthor: "author", file: "a", resolution: .resolved, reactions: [authorDown, authorDown])
+        let relax = SignalAnalysis.candidates([t2], countAuthorReactions: true)
+        #expect(relax.first?.direction == .relax)
+        #expect(SignalAnalysis.candidates([t2], countAuthorReactions: false).first?.direction == .reinforce)
     }
 
     @Test("resolution by Baton automation contributes no resolution weight")

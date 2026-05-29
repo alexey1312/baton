@@ -216,6 +216,10 @@ public enum Cascade {
             if let v = learn.lookbackDays { result.lookbackDays = v; prov.record("learn.lookback_days", file) }
             if let v = learn.minSignal { result.minSignal = v; prov.record("learn.min_signal", file) }
             if let v = learn.enabled { result.enabled = v; prov.record("learn.enabled", file) }
+            if let v = learn.countAuthorReactions {
+                result.countAuthorReactions = v
+                prov.record("learn.count_author_reactions", file)
+            }
         }
         // Clamp to sane minimums: a 0/negative min_signal would make every scope
         // pass volume gating, and a 0/negative lookback would read an empty window.

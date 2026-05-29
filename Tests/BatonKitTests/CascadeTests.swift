@@ -186,6 +186,23 @@ struct CascadeTests {
         #expect(eff.learn.enabled == false)
     }
 
+    @Test("learn count_author_reactions cascades closest-wins and defaults to false")
+    func learnCountAuthorReactionsCascade() throws {
+        // Default: unset anywhere → false.
+        let plain = scope("ios", BatonConfig(agent: AgentConfig(kind: .claude)))
+        #expect(try Cascade.effective(for: plain, in: [plain]).learn.countAuthorReactions == false)
+
+        // Child override wins over root.
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            learn: LearnConfig(countAuthorReactions: false)
+        ))
+        let c = scope("ios", BatonConfig(learn: LearnConfig(countAuthorReactions: true)))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.learn.countAuthorReactions == true)
+        #expect(eff.provenance.source(for: "learn.count_author_reactions") == .file("ios/baton.toml"))
+    }
+
     @Test("learn enabled defaults to true when unset anywhere in the chain")
     func learnEnabledDefaultsTrue() throws {
         let c = scope("ios", BatonConfig(agent: AgentConfig(kind: .claude)))

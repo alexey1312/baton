@@ -86,8 +86,8 @@ public enum SignalAnalysis {
     /// (augmented, not replaced, by reaction weight). Outdated threads contribute
     /// no resolution weight (weighted low); resolution by Baton's own automation
     /// contributes none either.
-    public static func weight(_ thread: ReviewThreadSignal) -> Int {
-        resolutionContribution(thread) + thread.netReactionWeight
+    public static func weight(_ thread: ReviewThreadSignal, countAuthorReactions: Bool = false) -> Int {
+        resolutionContribution(thread) + thread.netReactionWeight(countAuthorReactions: countAuthorReactions)
     }
 
     private static func resolutionContribution(_ thread: ReviewThreadSignal) -> Int {
@@ -106,20 +106,24 @@ public enum SignalAnalysis {
     /// Rank Baton-authored threads into rule candidates by summing per-finding
     /// weight. Sorted by ascending weight so the most 👎-heavy relax candidates
     /// lead. Human-authored threads carry no finding identity and are excluded.
-    public static func candidates(_ threads: [ReviewThreadSignal]) -> [RuleCandidate] {
+    public static func candidates(
+        _ threads: [ReviewThreadSignal],
+        countAuthorReactions: Bool = false
+    ) -> [RuleCandidate] {
         var order: [String] = []
         var byKey: [String: RuleCandidate] = [:]
 
         for thread in threads {
             guard thread.isBatonAuthored, let finding = thread.finding else { continue }
             let key = finding.cacheKey
+            let threadWeight = weight(thread, countAuthorReactions: countAuthorReactions)
             if var existing = byKey[key] {
-                existing.weight += weight(thread)
+                existing.weight += threadWeight
                 existing.threadCount += 1
                 byKey[key] = existing
             } else {
                 order.append(key)
-                byKey[key] = RuleCandidate(finding: finding, weight: weight(thread), threadCount: 1)
+                byKey[key] = RuleCandidate(finding: finding, weight: threadWeight, threadCount: 1)
             }
         }
 

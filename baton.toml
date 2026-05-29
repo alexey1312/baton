@@ -25,3 +25,7 @@ glob = ["**/*.swift"]
 prompt = """
 Review the added (`+`) lines in the diff for Swift Concurrency correctness, using the attached Swift Concurrency skill as your reference. Flag data races, unsafe `@unchecked Sendable` / `nonisolated(unsafe)` / `@preconcurrency` use without a stated invariant, unjustified blanket `@MainActor`, blocking work on an actor or the main actor, and incorrect `async`/`await`, `Task`, or actor-isolation usage. Cite the specific concern. Return {"findings": []} if nothing is wrong.
 """
+
+[learn]
+# Solo maintainer reviews their own PRs, so their 👍/👎 are legitimate signal.
+count_author_reactions = true

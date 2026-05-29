@@ -112,6 +112,8 @@ struct ConfigCommand: AsyncParsableCommand {
         lines.append("  enabled = \(learn.enabled)\(provenance("learn.enabled", config))")
         lines.append("  lookback_days = \(learn.lookbackDays)\(provenance("learn.lookback_days", config))")
         lines.append("  min_signal = \(learn.minSignal)\(provenance("learn.min_signal", config))")
+        let car = learn.countAuthorReactions
+        lines.append("  count_author_reactions = \(car)\(provenance("learn.count_author_reactions", config))")
         // Delivery fields are repository-global; show them on the root scope only.
         guard config.scopePath.isEmpty else { return lines }
         lines.append("  branch = \(learn.branch)\(provenance("learn.branch", config))")

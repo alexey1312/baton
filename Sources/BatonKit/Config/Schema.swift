@@ -212,6 +212,10 @@ public struct LearnConfig: Codable, Equatable, Sendable {
     public var lookbackDays: Int?
     public var minSignal: Int?
     public var enabled: Bool?
+    /// Whether the pull request author's own 👍/👎 reactions are counted toward
+    /// usefulness signal. Defaults off (a self-reaction cannot manufacture signal),
+    /// but a solo maintainer who reviews their own PRs can opt in.
+    public var countAuthorReactions: Bool?
 
     public init(
         branch: String? = nil,
@@ -222,7 +226,8 @@ public struct LearnConfig: Codable, Equatable, Sendable {
         draft: Bool? = nil,
         lookbackDays: Int? = nil,
         minSignal: Int? = nil,
-        enabled: Bool? = nil
+        enabled: Bool? = nil,
+        countAuthorReactions: Bool? = nil
     ) {
         self.branch = branch
         self.base = base
@@ -233,6 +238,7 @@ public struct LearnConfig: Codable, Equatable, Sendable {
         self.lookbackDays = lookbackDays
         self.minSignal = minSignal
         self.enabled = enabled
+        self.countAuthorReactions = countAuthorReactions
     }
 
     enum CodingKeys: String, CodingKey {
@@ -241,6 +247,7 @@ public struct LearnConfig: Codable, Equatable, Sendable {
         case lookbackDays = "lookback_days"
         case minSignal = "min_signal"
         case enabled
+        case countAuthorReactions = "count_author_reactions"
     }
 }
 

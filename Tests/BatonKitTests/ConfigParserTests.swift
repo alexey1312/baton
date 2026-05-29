@@ -103,6 +103,7 @@ struct ConfigParserTests {
         lookback_days = 30
         min_signal = 5
         enabled = false
+        count_author_reactions = true
         """
         let parsed = try ConfigParser.parse(toml, path: "baton.toml")
         let learn = parsed.config.learn
@@ -115,6 +116,7 @@ struct ConfigParserTests {
         #expect(learn?.lookbackDays == 30)
         #expect(learn?.minSignal == 5)
         #expect(learn?.enabled == false)
+        #expect(learn?.countAuthorReactions == true)
         #expect(parsed.warnings.isEmpty)
     }
 

@@ -73,6 +73,8 @@ public struct EffectiveLearn: Equatable, Sendable {
     public var lookbackDays: Int
     public var minSignal: Int
     public var enabled: Bool
+    /// Whether the pull request author's own reactions count toward signal.
+    public var countAuthorReactions: Bool
     // Delivery (root-only).
     public var branch: String
     public var base: String?
@@ -85,6 +87,7 @@ public struct EffectiveLearn: Equatable, Sendable {
         lookbackDays: Int = ConfigDefaults.learnLookbackDays,
         minSignal: Int = ConfigDefaults.learnMinSignal,
         enabled: Bool = ConfigDefaults.learnEnabled,
+        countAuthorReactions: Bool = ConfigDefaults.learnCountAuthorReactions,
         branch: String = ConfigDefaults.learnBranch,
         base: String? = nil,
         reviewers: [String] = [],
@@ -95,6 +98,7 @@ public struct EffectiveLearn: Equatable, Sendable {
         self.lookbackDays = lookbackDays
         self.minSignal = minSignal
         self.enabled = enabled
+        self.countAuthorReactions = countAuthorReactions
         self.branch = branch
         self.base = base
         self.reviewers = reviewers

@@ -104,8 +104,12 @@ The system SHALL bucket collected threads into accepted, ignored, outdated, and 
 categories, and SHALL combine the reaction weight (+1 per 👍, −1 per 👎) with the thread's
 resolution state to rank findings — treating 👎-heavy rules as candidates to relax or remove
 and 👍-heavy rules as candidates to reinforce. Reaction weight SHALL augment, not replace, the
-resolution signal. Reactions authored by the pull request's own author SHALL NOT be counted,
-so a self-reaction cannot manufacture signal.
+resolution signal. Reactions authored by the pull request's own author SHALL NOT be counted by
+default, so a self-reaction cannot manufacture signal; when the effective
+`[learn].count_author_reactions` is true (e.g. a solo maintainer who reviews their own pull
+requests), the system SHALL count the pull request author's own reactions as well. The effective
+`count_author_reactions` SHALL default to false and SHALL cascade closest-wins like the other
+`[learn]` analysis fields.
 
 #### Scenario: Upvoted, resolved finding is a reinforce candidate
 
@@ -127,10 +131,17 @@ so a self-reaction cannot manufacture signal.
 - **WHEN** a thread is resolved but carries net-negative 👎 reactions
 - **THEN** the system SHALL NOT treat it as a reinforce candidate solely because it was resolved
 
-#### Scenario: Author's own reaction is not counted
+#### Scenario: Author's own reaction is not counted by default
 
 - **WHEN** the 👍/👎 reaction on a Baton thread was authored by the pull request's own author
+- **AND** the effective `[learn].count_author_reactions` is false (the default)
 - **THEN** the system SHALL exclude that reaction from the reaction weight
+
+#### Scenario: Author's own reaction is counted when opted in
+
+- **WHEN** the 👍/👎 reaction on a Baton thread was authored by the pull request's own author
+- **AND** the effective `[learn].count_author_reactions` is true
+- **THEN** the system SHALL include that reaction in the reaction weight
 
 ### Requirement: Edit Allowlist Excludes Source Code
 

@@ -30,6 +30,10 @@ public enum ConfigDefaults {
     public static let learnMinSignal = 1
     /// Whether `learn` runs for a scope when `[learn].enabled` is unset anywhere in the chain.
     public static let learnEnabled = true
+    /// Whether the pull request author's own 👍/👎 reactions count toward signal
+    /// when `[learn].count_author_reactions` is unset (off — a self-reaction cannot
+    /// manufacture signal; solo maintainers can opt in).
+    public static let learnCountAuthorReactions = false
     /// Branch the rolling `learn` pull request lives on when `[learn].branch` is unset.
     public static let learnBranch = "learn"
     /// Whether the rolling `learn` pull request opens as a draft when `[learn].draft` is unset.
