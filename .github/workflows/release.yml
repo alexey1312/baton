@@ -217,7 +217,11 @@ jobs:
   update-homebrew:
     name: Update Homebrew Tap
     needs: [version, publish]
-    if: ${{ needs.version.outputs.is_prerelease == 'false' }}
+    # Stable releases only, and only once the repo is public: while private the
+    # release assets are not anonymously downloadable (the formula's `curl` would
+    # 404) and `brew install` cannot fetch them. Auto-enables when the repo flips
+    # to public — no edit needed then.
+    if: ${{ needs.version.outputs.is_prerelease == 'false' && github.event.repository.private == false }}
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.version.outputs.version }}
