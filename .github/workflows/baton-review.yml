@@ -59,10 +59,16 @@ jobs:
           apt-get install -y curl git gh
 
       # Check out the PR head by SHA (not head.ref — that is attacker-controllable).
+      # fetch-depth: 0 also brings origin/* (incl. origin/<base>) for the diff base.
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      # The container runs git as a different uid than the checkout owner; without this
+      # both our git calls and baton's GitRunner fail with "detected dubious ownership".
+      - name: Trust the workspace for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Install claude CLI
         uses: ./.github/actions/install-claude
@@ -73,12 +79,6 @@ jobs:
 
       - name: Build baton
         run: swift build -c release
-
-      # Make the PR base branch available locally so review can diff base...head.
-      - name: Fetch PR base branch
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       # Save a run record. continue-on-error so a fail_on exit (high finding) does not
       # abort the job before findings are published — the comments carry the signal.
