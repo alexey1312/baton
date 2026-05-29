@@ -95,14 +95,20 @@ public struct ProcessExecutor: Sendable {
     /// so a child that ignores SIGTERM cannot hang `waitUntilExit` forever.
     private static func armTimeout(_ process: Process, seconds: Int, flag: TimeoutFlag) -> DispatchSourceTimer? {
         guard seconds > 0 else { return nil }
-        let source = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
+        // A dedicated queue, not `DispatchQueue.global()`: every concurrent `run()`
+        // blocks a global-pool thread in `waitUntilExit()`, so under a parallel test
+        // suite or fan-out the shared pool can starve and fire this timer late —
+        // letting the child run to natural completion instead of being killed at the
+        // deadline. An isolated queue guarantees the terminator runs on time.
+        let queue = DispatchQueue(label: "dev.baton.process-timeout")
+        let source = DispatchSource.makeTimerSource(queue: queue)
         source.schedule(deadline: .now() + .seconds(seconds))
         source.setEventHandler {
             guard process.isRunning else { return }
             flag.set()
             process.terminate()
             #if !os(Windows)
-            DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(killGraceSeconds)) {
+            queue.asyncAfter(deadline: .now() + .seconds(killGraceSeconds)) {
                 if process.isRunning { kill(process.processIdentifier, SIGKILL) }
             }
             #endif
