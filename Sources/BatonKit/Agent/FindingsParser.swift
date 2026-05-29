@@ -22,7 +22,9 @@ public struct ParsedFindings: Sendable {
 /// literals. Malformed individual findings are dropped or clamped (never crashes
 /// the run) with a warning.
 public enum FindingsParser {
-    /// A loosely-typed finding as emitted by the agent.
+    /// A loosely-typed finding as emitted by the agent. Each field decodes
+    /// leniently so a single mistyped field (e.g. `"line": "42"`) drops/coerces
+    /// just that field rather than aborting the decode of the whole array.
     private struct RawFinding: Decodable {
         var file: String?
         var line: Int?
@@ -30,6 +32,36 @@ public enum FindingsParser {
         var title: String?
         var body: String?
         var instructions: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case file, line, severity, title, body, instructions
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            file = Self.string(c, .file)
+            severity = Self.string(c, .severity)
+            title = Self.string(c, .title)
+            body = Self.string(c, .body)
+            instructions = Self.string(c, .instructions)
+            line = Self.int(c, .line)
+        }
+
+        /// Decode a string field, tolerating a number emitted in its place.
+        private static func string(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> String? {
+            if let s = try? c.decodeIfPresent(String.self, forKey: key) { return s }
+            if let i = try? c.decodeIfPresent(Int.self, forKey: key) { return String(i) }
+            if let d = try? c.decodeIfPresent(Double.self, forKey: key) { return String(d) }
+            return nil
+        }
+
+        /// Decode `line` from an Int, a Double, or a numeric String.
+        private static func int(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Int? {
+            if let i = try? c.decodeIfPresent(Int.self, forKey: key) { return i }
+            if let d = try? c.decodeIfPresent(Double.self, forKey: key) { return Int(d) }
+            if let s = try? c.decodeIfPresent(String.self, forKey: key), let i = Int(s) { return i }
+            return nil
+        }
     }
 
     private struct RawPayload: Decodable {
@@ -87,8 +119,8 @@ public enum FindingsParser {
 
     private static func decode(_ json: String) -> [RawFinding]? {
         let data = Data(json.utf8)
-        if let array = try? JSONDecoder().decode([RawFinding].self, from: data) { return array }
-        if let payload = try? JSONDecoder().decode(RawPayload.self, from: data), let findings = payload.findings {
+        if let array = try? JSONCodec.decode([RawFinding].self, from: data) { return array }
+        if let payload = try? JSONCodec.decode(RawPayload.self, from: data), let findings = payload.findings {
             return findings
         }
         return nil

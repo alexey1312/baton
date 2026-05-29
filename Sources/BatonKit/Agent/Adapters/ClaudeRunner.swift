@@ -48,7 +48,7 @@ public struct ClaudeRunner: AgentRunner {
 
     public func parse(_ output: AgentOutput) throws -> ParsedFindings {
         guard let data = output.stdout.data(using: .utf8),
-              let envelope = try? JSONDecoder().decode(Envelope.self, from: data)
+              let envelope = try? JSONCodec.decode(Envelope.self, from: data)
         else {
             return try FindingsParser.parse(output.stdout)
         }

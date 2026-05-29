@@ -40,6 +40,18 @@ struct FindingsParserTests {
         #expect(parsed.findings[0].title == "has } brace")
     }
 
+    @Test("a mistyped `line` is coerced and does not drop the rest of the batch")
+    func lenientLineType() throws {
+        // First finding emits line as a string; a strict array decode would abort
+        // the whole batch. Both findings must survive, with line coerced to Int.
+        let json = #"[{"file":"a","line":"42","severity":"low","title":"t","body":"b"},"#
+            + #"{"file":"c","line":7,"severity":"low","title":"u","body":"d"}]"#
+        let parsed = try FindingsParser.parse(json)
+        #expect(parsed.findings.count == 2)
+        #expect(parsed.findings[0].line == 42)
+        #expect(parsed.findings[1].line == 7)
+    }
+
     @Test("instructions maps to aiInstructions")
     func instructions() throws {
         let json = #"[{"file":"a","severity":"low","title":"t","body":"b","instructions":"do x"}]"#

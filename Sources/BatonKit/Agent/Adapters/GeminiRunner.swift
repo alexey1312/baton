@@ -34,7 +34,7 @@ public struct GeminiRunner: AgentRunner {
     /// is not a recognizable envelope (so plain JSON output still parses).
     private static func unwrap(_ stdout: String) -> String {
         guard let data = stdout.data(using: .utf8),
-              let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              let envelope = try? JSONCodec.decode(Envelope.self, from: data),
               let response = envelope.response
         else {
             return stdout
