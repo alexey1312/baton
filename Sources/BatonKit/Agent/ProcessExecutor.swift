@@ -15,19 +15,22 @@ public struct ProcessExecutor: Sendable {
 
     /// Run `invocation`, returning the captured result. Throws `AgentError.timedOut`
     /// when the timeout elapses before the process exits.
+    ///
+    /// Completion is driven by the process's `terminationHandler` (Foundation's own
+    /// `waitpid` monitor), not a blocking `waitUntilExit()` on a GCD worker — so a
+    /// parallel fan-out of runs cannot starve the global pool. The timeout
+    /// terminator likewise runs on a dedicated OS thread, never the pool.
     public func run(_ invocation: ProcessInvocation, agentName: String) async throws -> ProcessResult {
         try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global().async {
-                do {
-                    try continuation.resume(returning: Self.runBlocking(invocation, agentName: agentName))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
+            Self.launch(invocation, agentName: agentName, continuation: continuation)
         }
     }
 
-    private static func runBlocking(_ invocation: ProcessInvocation, agentName: String) throws -> ProcessResult {
+    private static func launch(
+        _ invocation: ProcessInvocation,
+        agentName: String,
+        continuation: CheckedContinuation<ProcessResult, Error>
+    ) {
         let process = Process()
         ProcessLauncher.configure(process, executable: invocation.executable, arguments: invocation.arguments)
         process.currentDirectoryURL = invocation.workingDirectory
@@ -44,25 +47,44 @@ public struct ProcessExecutor: Sendable {
 
         // Concurrently drain both pipes so the child cannot block on a full buffer.
         let buffers = StreamBuffers()
-        outPipe.fileHandleForReading.readabilityHandler = { handle in
-            buffers.appendOut(handle.availableData)
-        }
-        errPipe.fileHandleForReading.readabilityHandler = { handle in
-            buffers.appendErr(handle.availableData)
-        }
+        outPipe.fileHandleForReading.readabilityHandler = { buffers.appendOut($0.availableData) }
+        errPipe.fileHandleForReading.readabilityHandler = { buffers.appendErr($0.availableData) }
 
-        // Termination handler is installed before run() (ExFig pattern).
-        process.terminationHandler = { _ in }
-
-        // Arm the timeout terminator before waiting.
         let timedOut = TimeoutFlag()
-        let timer = armTimeout(process, seconds: invocation.timeout, flag: timedOut)
-
+        let resume = ResumeOnce()
+        let exited = DispatchSemaphore(value: 0)
         let start = Date()
+
+        process.terminationHandler = { proc in
+            exited.signal() // wake the terminator so it neither kills nor lingers
+            outPipe.fileHandleForReading.readabilityHandler = nil
+            errPipe.fileHandleForReading.readabilityHandler = nil
+            buffers.appendOut(outPipe.fileHandleForReading.readDataToEndOfFile())
+            buffers.appendErr(errPipe.fileHandleForReading.readDataToEndOfFile())
+            guard resume.tryResume() else { return }
+            if timedOut.isSet {
+                continuation.resume(throwing: AgentError.timedOut(agent: agentName, seconds: invocation.timeout))
+            } else {
+                continuation.resume(returning: ProcessResult(
+                    status: proc.terminationStatus,
+                    stdout: buffers.outData,
+                    stderr: buffers.errString,
+                    duration: Date().timeIntervalSince(start)
+                ))
+            }
+        }
+
         do {
             try process.run()
         } catch {
-            throw AgentError.binaryNotFound(agent: agentName, binary: invocation.executable)
+            exited.signal()
+            if resume.tryResume() {
+                continuation.resume(throwing: AgentError.binaryNotFound(
+                    agent: agentName,
+                    binary: invocation.executable
+                ))
+            }
+            return
         }
 
         if let stdin = invocation.stdin, let inPipe {
@@ -70,51 +92,29 @@ public struct ProcessExecutor: Sendable {
             try? inPipe.fileHandleForWriting.close()
         }
 
-        process.waitUntilExit()
-        timer?.cancel()
-
-        outPipe.fileHandleForReading.readabilityHandler = nil
-        errPipe.fileHandleForReading.readabilityHandler = nil
-        buffers.appendOut(outPipe.fileHandleForReading.readDataToEndOfFile())
-        buffers.appendErr(errPipe.fileHandleForReading.readDataToEndOfFile())
-
-        if timedOut.isSet {
-            throw AgentError.timedOut(agent: agentName, seconds: invocation.timeout)
-        }
-
-        return ProcessResult(
-            status: process.terminationStatus,
-            stdout: buffers.outData,
-            stderr: buffers.errString,
-            duration: Date().timeIntervalSince(start)
-        )
+        armTimeout(process, seconds: invocation.timeout, flag: timedOut, exited: exited)
     }
 
-    /// Schedule a one-shot terminator that flags the timeout and SIGTERMs the
-    /// process at the deadline, escalating to SIGKILL after a grace period (POSIX)
-    /// so a child that ignores SIGTERM cannot hang `waitUntilExit` forever.
-    private static func armTimeout(_ process: Process, seconds: Int, flag: TimeoutFlag) -> DispatchSourceTimer? {
-        guard seconds > 0 else { return nil }
-        // A dedicated queue, not `DispatchQueue.global()`: every concurrent `run()`
-        // blocks a global-pool thread in `waitUntilExit()`, so under a parallel test
-        // suite or fan-out the shared pool can starve and fire this timer late —
-        // letting the child run to natural completion instead of being killed at the
-        // deadline. An isolated queue guarantees the terminator runs on time.
-        let queue = DispatchQueue(label: "dev.baton.process-timeout")
-        let source = DispatchSource.makeTimerSource(queue: queue)
-        source.schedule(deadline: .now() + .seconds(seconds))
-        source.setEventHandler {
+    /// Arm a one-shot terminator on a dedicated OS thread: it waits on `exited` until
+    /// the deadline, then flags the timeout and SIGTERMs the process, escalating to
+    /// SIGKILL after a grace period (POSIX) so a child that ignores SIGTERM cannot
+    /// linger. A real thread (not a GCD queue, which shares the starvable global
+    /// pool) guarantees the terminator fires on time even under heavy fan-out.
+    private static func armTimeout(_ process: Process, seconds: Int, flag: TimeoutFlag, exited: DispatchSemaphore) {
+        guard seconds > 0 else { return }
+        let thread = Thread {
+            if exited.wait(timeout: .now() + .seconds(seconds)) == .success { return } // exited in time
             guard process.isRunning else { return }
             flag.set()
             process.terminate()
             #if !os(Windows)
-            queue.asyncAfter(deadline: .now() + .seconds(killGraceSeconds)) {
-                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+            if exited.wait(timeout: .now() + .seconds(killGraceSeconds)) == .timedOut, process.isRunning {
+                kill(process.processIdentifier, SIGKILL)
             }
             #endif
         }
-        source.resume()
-        return source
+        thread.stackSize = 256 << 10
+        thread.start()
     }
 }
 
@@ -159,5 +159,19 @@ private final class TimeoutFlag: @unchecked Sendable {
     var isSet: Bool {
         lock.lock(); defer { lock.unlock() }
         return value
+    }
+}
+
+/// Guards a `CheckedContinuation` against a double resume: the termination handler
+/// and the launch-failure path both try to resume, but exactly one must win.
+private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var resumed = false
+
+    func tryResume() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if resumed { return false }
+        resumed = true
+        return true
     }
 }
