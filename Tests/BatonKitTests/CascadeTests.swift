@@ -349,7 +349,7 @@ struct CascadeTests {
     }
 }
 
-// Extensions count separately toward type_body_length, keeping the suite under the cap.
+/// Extensions count separately toward type_body_length, keeping the suite under the cap.
 extension CascadeTests {
     @Test("learn agent/model cascade closest-wins and default to nil")
     func learnAgentModelCascade() throws {
