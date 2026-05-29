@@ -28,6 +28,12 @@ struct PublishCommand: AsyncParsableCommand {
     @Option(help: "Repository root to operate on.")
     var repo: String?
 
+    @Flag(
+        inversion: .prefixedNo,
+        help: "Auto-resolve Baton's own outdated review threads (overrides [publish].resolve_outdated_threads)."
+    )
+    var resolveOutdatedThreads: Bool?
+
     func run() async throws {
         try await present(global.outputMode) {
             let root = try CLISupport.resolveRepoRoot(repo)
@@ -36,8 +42,22 @@ struct PublishCommand: AsyncParsableCommand {
             try await Publisher.publish(
                 run: loaded,
                 overrides: .init(ghRepo: ghRepo, headSHA: headSHA, pr: pr),
+                resolveOutdatedThreads: resolveOutdatedThreadsSetting(root: root),
                 outputMode: global.outputMode
             )
         }
+    }
+
+    /// The effective auto-resolve setting: an explicit `--[no-]resolve-outdated-threads`
+    /// flag wins; otherwise the root `[publish].resolve_outdated_threads`. A config-read
+    /// failure falls back to the safe default (off) rather than failing a publish that
+    /// operates on an already-saved run.
+    private func resolveOutdatedThreadsSetting(root: URL) -> Bool {
+        if let resolveOutdatedThreads { return resolveOutdatedThreads }
+        guard let discovery = try? ScopeDiscovery.discover(repoRoot: root),
+              let rootScope = discovery.scopes.first(where: { $0.path.isEmpty }),
+              let effective = try? Cascade.effective(for: rootScope, in: discovery.scopes)
+        else { return ConfigDefaults.resolveOutdatedThreads }
+        return effective.publish.resolveOutdatedThreads
     }
 }

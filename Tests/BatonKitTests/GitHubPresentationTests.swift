@@ -32,6 +32,14 @@ struct GitHubPresentationTests {
         #expect(full.contains(BatonMarker.finding))
     }
 
+    @Test("auto-resolve reply carries its own marker and never the finding marker")
+    func autoResolvedReply() {
+        let body = BatonMarker.autoResolvedReplyBody(reason: "the finding's anchor is outdated")
+        #expect(body.contains(BatonMarker.autoResolved))
+        #expect(!body.contains(BatonMarker.finding)) // must stay invisible to dedupe + finding parsing
+        #expect(body.contains("outdated"))
+    }
+
     @Test("last-reviewed marker round-trips")
     func lastReviewed() {
         let marker = BatonMarker.lastReviewed("abc123")

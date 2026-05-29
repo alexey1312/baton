@@ -18,6 +18,7 @@ public enum Cascade {
         let reviews = resolveReviews(chain, &prov)
         let security = resolveSecurity(chain, &prov)
         let learn = resolveLearn(chain, &prov)
+        let publish = resolvePublish(chain, &prov)
 
         // A scope with reviews must have a resolvable agent block.
         if !reviews.isEmpty, agent == nil {
@@ -44,6 +45,7 @@ public enum Cascade {
             reviews: reviews,
             security: security,
             learn: learn,
+            publish: publish,
             provenance: prov
         )
     }
@@ -148,6 +150,21 @@ public enum Cascade {
         guard let root = chain.first, let security = root.config.security else { return nil }
         prov.record("security", .file(root.configPath))
         return security
+    }
+
+    private static func resolvePublish(
+        _ chain: [ScopeConfig],
+        _ prov: inout ConfigProvenance
+    ) -> EffectivePublish {
+        // Publish is honored only at the repository-root scope (chain head): there
+        // is one publish per pull request, so this is not a per-scope cascade.
+        var result = EffectivePublish()
+        guard let root = chain.first, let publish = root.config.publish else { return result }
+        if let v = publish.resolveOutdatedThreads {
+            result.resolveOutdatedThreads = v
+            prov.record("publish.resolve_outdated_threads", .file(root.configPath))
+        }
+        return result
     }
 
     private static func resolveLearn(

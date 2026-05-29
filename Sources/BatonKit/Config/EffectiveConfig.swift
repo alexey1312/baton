@@ -104,6 +104,16 @@ public struct EffectiveLearn: Equatable, Sendable {
     }
 }
 
+/// The fully resolved `[publish]` values, read only from the repository-root
+/// scope (one publish per pull request).
+public struct EffectivePublish: Equatable, Sendable {
+    public var resolveOutdatedThreads: Bool
+
+    public init(resolveOutdatedThreads: Bool = ConfigDefaults.resolveOutdatedThreads) {
+        self.resolveOutdatedThreads = resolveOutdatedThreads
+    }
+}
+
 /// The effective configuration computed for a single scope after the cascade.
 public struct EffectiveConfig: Sendable {
     /// Repo-relative scope root (`""` for the repository root).
@@ -120,6 +130,8 @@ public struct EffectiveConfig: Sendable {
     public var security: SecurityConfig?
     /// Resolved `[learn]` block (analysis cascades, delivery root-only).
     public var learn: EffectiveLearn
+    /// Resolved `[publish]` block (root-only).
+    public var publish: EffectivePublish
     /// Provenance for `config --explain`.
     public var provenance: ConfigProvenance
 
@@ -131,6 +143,7 @@ public struct EffectiveConfig: Sendable {
         reviews: [ReviewConfig],
         security: SecurityConfig?,
         learn: EffectiveLearn = EffectiveLearn(),
+        publish: EffectivePublish = EffectivePublish(),
         provenance: ConfigProvenance
     ) {
         self.scopePath = scopePath
@@ -140,6 +153,7 @@ public struct EffectiveConfig: Sendable {
         self.reviews = reviews
         self.security = security
         self.learn = learn
+        self.publish = publish
         self.provenance = provenance
     }
 

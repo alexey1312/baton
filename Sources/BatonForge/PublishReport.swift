@@ -13,6 +13,10 @@ public struct PublishReport: Sendable, Equatable {
     public var checkRunsSkipped: Int
     /// Whether a PR review was posted (false when no PR or no inline comments).
     public var reviewPosted: Bool
+    /// Baton-authored outdated review threads auto-resolved this publish.
+    public var threadsResolved: Int
+    /// Auto-resolutions skipped (token lacked permission, read failed, …).
+    public var threadsResolveSkipped: Int
     /// Non-fatal warnings (stale head, degraded Check Runs, …).
     public var warnings: [String]
 
@@ -23,6 +27,8 @@ public struct PublishReport: Sendable, Equatable {
         checkRunsCreated: Int = 0,
         checkRunsSkipped: Int = 0,
         reviewPosted: Bool = false,
+        threadsResolved: Int = 0,
+        threadsResolveSkipped: Int = 0,
         warnings: [String] = []
     ) {
         self.inlineCommentsPosted = inlineCommentsPosted
@@ -31,6 +37,8 @@ public struct PublishReport: Sendable, Equatable {
         self.checkRunsCreated = checkRunsCreated
         self.checkRunsSkipped = checkRunsSkipped
         self.reviewPosted = reviewPosted
+        self.threadsResolved = threadsResolved
+        self.threadsResolveSkipped = threadsResolveSkipped
         self.warnings = warnings
     }
 }

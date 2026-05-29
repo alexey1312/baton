@@ -62,19 +62,8 @@ public struct GitHubLearnForge: LearnSignalSource {
     // MARK: - Thread signal
 
     public func threadSignals(for pullRequest: MergedPullRequest) async throws -> [ReviewThreadSignal] {
-        let body = try LearnAPIBodies.json(LearnAPIBodies.ReviewThreadsRequest(
-            owner: owner, name: name, number: pullRequest.number
-        ))
-        let result = try await graphql(body)
-        let decoded = try LearnAPIBodies.decode(LearnAPIBodies.ThreadsResponse.self, from: result.stdout)
-        if let errors = decoded.errors, !errors.isEmpty {
-            throw ForgeError.publishFailed(
-                detail: "GitHub GraphQL error: " + errors.map(\.message).joined(separator: "; ")
-            )
-        }
-        guard let pr = decoded.data?.repository?.pullRequest else {
-            throw ForgeError.publishFailed(detail: "GitHub GraphQL response omitted the pull request payload")
-        }
+        let reader = ReviewThreadReader(gh: gh, maxAttempts: options.maxAttempts)
+        let pr = try await reader.pullRequest(owner: owner, name: name, number: pullRequest.number)
         let prAuthor = pr.author?.login ?? pullRequest.author
 
         var signals: [ReviewThreadSignal] = []
@@ -88,7 +77,7 @@ public struct GitHubLearnForge: LearnSignalSource {
     }
 
     private func makeSignal(
-        node: LearnAPIBodies.ThreadsResponse.ThreadNode,
+        node: ReviewThreadReader.ThreadsResponse.ThreadNode,
         pr: MergedPullRequest,
         prAuthor: String
     ) async throws -> ReviewThreadSignal? {
@@ -111,7 +100,9 @@ public struct GitHubLearnForge: LearnSignalSource {
             isBatonAuthored: isBaton,
             resolution: resolution,
             resolutionActor: actor,
-            resolvedByAutomation: isAutomation(actor),
+            // Token-independent provenance: a thread carrying the auto-resolve
+            // marker is Baton automation regardless of the resolving actor's login.
+            resolvedByAutomation: node.hasComment(containing: BatonMarker.autoResolved) || isAutomation(actor),
             reactions: reactions,
             finding: isBaton ? BatonMarker.parseFinding(body: body, file: file, line: comment.line) : nil
         )
@@ -149,10 +140,6 @@ public struct GitHubLearnForge: LearnSignalSource {
         var args = ["api", "--method", method, path]
         if paginate { args.append("--paginate") }
         return try await client.run(args, stdin: nil, mapError: Self.terminalError)
-    }
-
-    private func graphql(_ body: String) async throws -> GHResult {
-        try await client.run(["api", "graphql", "--input", "-"], stdin: body, mapError: Self.terminalError)
     }
 
     /// Signal reads have no degrade path: any terminal failure is a hard error.

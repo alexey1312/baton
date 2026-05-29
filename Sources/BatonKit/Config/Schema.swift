@@ -11,6 +11,7 @@ public struct BatonConfig: Codable, Equatable, Sendable {
     public var disabledReviews: [String]?
     public var security: SecurityConfig?
     public var learn: LearnConfig?
+    public var publish: PublishConfig?
 
     public init(
         agent: AgentConfig? = nil,
@@ -19,7 +20,8 @@ public struct BatonConfig: Codable, Equatable, Sendable {
         reviews: [ReviewConfig]? = nil,
         disabledReviews: [String]? = nil,
         security: SecurityConfig? = nil,
-        learn: LearnConfig? = nil
+        learn: LearnConfig? = nil,
+        publish: PublishConfig? = nil
     ) {
         self.agent = agent
         self.defaults = defaults
@@ -28,10 +30,11 @@ public struct BatonConfig: Codable, Equatable, Sendable {
         self.disabledReviews = disabledReviews
         self.security = security
         self.learn = learn
+        self.publish = publish
     }
 
     enum CodingKeys: String, CodingKey {
-        case agent, defaults, skills, reviews, security, learn
+        case agent, defaults, skills, reviews, security, learn, publish
         case disabledReviews = "disabled_reviews"
     }
 }
@@ -229,5 +232,22 @@ public struct LearnConfig: Codable, Equatable, Sendable {
         case lookbackDays = "lookback_days"
         case minSignal = "min_signal"
         case enabled
+    }
+}
+
+/// The `[publish]` block. Honored only at the repository-root scope: there is one
+/// publish per pull request, so resolution is a repo-level write (like `[learn]`
+/// delivery), not a per-scope cascade.
+public struct PublishConfig: Codable, Equatable, Sendable {
+    /// Whether `publish` auto-resolves Baton-authored review threads GitHub has
+    /// flagged outdated. Defaults to ``ConfigDefaults/resolveOutdatedThreads`` (off).
+    public var resolveOutdatedThreads: Bool?
+
+    public init(resolveOutdatedThreads: Bool? = nil) {
+        self.resolveOutdatedThreads = resolveOutdatedThreads
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case resolveOutdatedThreads = "resolve_outdated_threads"
     }
 }

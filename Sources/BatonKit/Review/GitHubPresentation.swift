@@ -4,6 +4,19 @@ public enum BatonMarker {
     /// usefulness signal, which recovers a finding's identity from this marker).
     public static let finding = "<!-- baton:finding -->"
 
+    /// Marker on the reply Baton posts before auto-resolving one of its own
+    /// outdated threads. It makes the resolution self-identifying as automation
+    /// regardless of which token/actor performed it, so `learn` never counts it as
+    /// human signal. Deliberately distinct from ``finding`` so the reply is invisible
+    /// to dedupe and finding-identity parsing.
+    public static let autoResolved = "<!-- baton:auto-resolved -->"
+
+    /// The body of the reply Baton posts to a thread before auto-resolving it.
+    /// Carries ``autoResolved`` and never ``finding``.
+    public static func autoResolvedReplyBody(reason: String) -> String {
+        "Auto-resolved by Baton: \(reason).\n\n<sub>— Baton</sub>\n\(autoResolved)"
+    }
+
     /// The reviewed-head-SHA marker embedded in the Baton PR-review body.
     public static func lastReviewed(_ sha: String) -> String {
         "<!-- baton:last-reviewed=\(sha) -->"

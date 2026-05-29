@@ -13,10 +13,13 @@ public struct GitHubForge: Forge {
         public var inlineCommentCap: Int
         /// Max attempts for a single API call when rate-limited or hit by a 5xx.
         public var maxAttempts: Int
+        /// Whether publish auto-resolves Baton's own outdated review threads.
+        public var resolveOutdatedThreads: Bool
 
-        public init(inlineCommentCap: Int = 50, maxAttempts: Int = 3) {
+        public init(inlineCommentCap: Int = 50, maxAttempts: Int = 3, resolveOutdatedThreads: Bool = false) {
             self.inlineCommentCap = inlineCommentCap
             self.maxAttempts = maxAttempts
+            self.resolveOutdatedThreads = resolveOutdatedThreads
         }
     }
 
@@ -71,6 +74,10 @@ public struct GitHubForge: Forge {
         }
 
         try await postCheckRuns(plan: plan, context: context, report: &report)
+
+        if options.resolveOutdatedThreads, context.hasPR {
+            await resolveObsoleteThreads(context: context, report: &report)
+        }
         return report
     }
 
@@ -275,5 +282,95 @@ public struct GitHubForge: Forge {
             return .writePermissionDenied(detail: detail)
         }
         return .publishFailed(detail: detail)
+    }
+}
+
+// MARK: - Auto-resolve obsolete threads
+
+extension GitHubForge {
+    /// Auto-resolve Baton's own review threads GitHub has flagged outdated (opt-in
+    /// via `[publish].resolve_outdated_threads`). For each obsolete thread, post a
+    /// reply carrying ``BatonMarker/autoResolved`` (token-independent provenance so
+    /// `learn` never counts it as human signal), then invoke `resolveReviewThread`.
+    ///
+    /// Best-effort: a failed thread read or a per-thread permission/error is recorded
+    /// in `report` and skipped — auto-resolution never aborts a successful publish.
+    func resolveObsoleteThreads(context: PublishContext, report: inout PublishReport) async {
+        guard let prNumber = context.prNumber else { return }
+        let reader = ReviewThreadReader(gh: gh, maxAttempts: options.maxAttempts)
+        let threads: [ReviewThreadReader.ThreadsResponse.ThreadNode]
+        do {
+            threads = try await reader
+                .pullRequest(owner: context.owner, name: context.name, number: prNumber)
+                .reviewThreads.nodes
+        } catch {
+            report.warnings.append(
+                "Thread auto-resolution skipped (could not read review threads): \(describe(error))"
+            )
+            return
+        }
+        for thread in threads where isObsoleteBatonThread(thread) {
+            do {
+                try await resolveOne(thread, prNumber: prNumber, repo: context.repo)
+                report.threadsResolved += 1
+            } catch {
+                report.threadsResolveSkipped += 1
+                if report.threadsResolveSkipped == 1 {
+                    report.warnings.append(
+                        "Thread auto-resolution skipped: \(describe(error)) "
+                            + "The review and Check Runs were still posted."
+                    )
+                }
+            }
+        }
+    }
+
+    /// A thread is obsolete iff GitHub flagged it outdated, it is still unresolved,
+    /// it is Baton-authored (carries the finding marker), and it has not already been
+    /// auto-resolved (idempotency for re-runs).
+    private func isObsoleteBatonThread(_ thread: ReviewThreadReader.ThreadsResponse.ThreadNode) -> Bool {
+        thread.isOutdated && !thread.isResolved
+            && thread.hasComment(containing: BatonMarker.finding)
+            && !thread.hasComment(containing: BatonMarker.autoResolved)
+    }
+
+    private func resolveOne(
+        _ thread: ReviewThreadReader.ThreadsResponse.ThreadNode,
+        prNumber: Int,
+        repo: String
+    ) async throws {
+        guard let rootCommentId = thread.comments.nodes.first?.databaseId else {
+            throw ForgeError.publishFailed(detail: "thread \(thread.id) has no comment to reply to")
+        }
+        // Marker before mutation: if the resolve later fails, the thread is still
+        // attributed to automation and a re-run retries the resolve (still unresolved).
+        try await postReply(
+            prNumber: prNumber, repo: repo, inReplyTo: rootCommentId,
+            body: BatonMarker.autoResolvedReplyBody(reason: "the finding's anchor is outdated")
+        )
+        try await resolveReviewThread(threadId: thread.id)
+    }
+
+    private func postReply(prNumber: Int, repo: String, inReplyTo: Int, body: String) async throws {
+        let json = try GitHubAPIBodies.json(GitHubAPIBodies.ReplyComment(body: body, in_reply_to: inReplyTo))
+        let path = "/repos/\(repo)/pulls/\(prNumber)/comments"
+        _ = try await api.run(["api", "--method", "POST", path, "--input", "-"], stdin: json) { result in
+            Self.threadResolveError(result)
+        }
+    }
+
+    /// Map a terminal reply failure: a transient is preserved, a forbidden becomes
+    /// the degradable ``ForgeError/threadResolveForbidden``, anything else fails.
+    static func threadResolveError(_ result: GHResult) -> ForgeError {
+        if let transient = GHApiClient.transientError(result) { return transient }
+        let detail = GHApiClient.errorText(result)
+        let text = detail.lowercased()
+        let forbidden = text.contains("403") || text.contains("422") || text.contains("forbidden")
+            || text.contains("not accessible by integration") || text.contains("must have write access")
+        return forbidden ? .threadResolveForbidden(detail: detail) : .publishFailed(detail: detail)
+    }
+
+    private func describe(_ error: Error) -> String {
+        (error as? ForgeError)?.errorDescription ?? "\(error)"
     }
 }

@@ -34,4 +34,7 @@ public enum ConfigDefaults {
     public static let learnBranch = "learn"
     /// Whether the rolling `learn` pull request opens as a draft when `[learn].draft` is unset.
     public static let learnDraft = true
+    /// Whether `publish` auto-resolves Baton's own outdated review threads when
+    /// `[publish].resolve_outdated_threads` is unset (off — safe-by-default).
+    public static let resolveOutdatedThreads = false
 }

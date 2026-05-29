@@ -211,6 +211,24 @@ struct CascadeTests {
         #expect(eff.provenance.source(for: "learn.enabled") == .builtinDefault)
     }
 
+    // MARK: - Publish block
+
+    @Test("publish.resolve_outdated_threads is root-only and defaults to false")
+    func publishRootOnly() throws {
+        let r = root(BatonConfig(
+            agent: AgentConfig(kind: .claude),
+            publish: PublishConfig(resolveOutdatedThreads: true)
+        ))
+        let c = scope("ios", BatonConfig(publish: PublishConfig(resolveOutdatedThreads: false)))
+        let eff = try Cascade.effective(for: c, in: [r, c])
+        #expect(eff.publish.resolveOutdatedThreads == true) // root wins; child ignored
+
+        let bare = scope("ios", BatonConfig(agent: AgentConfig(kind: .claude)))
+        let effDefault = try Cascade.effective(for: bare, in: [bare])
+        #expect(effDefault.publish.resolveOutdatedThreads == false) // documented default
+        #expect(effDefault.provenance.source(for: "publish.resolve_outdated_threads") == .builtinDefault)
+    }
+
     // MARK: - Provenance
 
     @Test("provenance attributes each effective value to its source")

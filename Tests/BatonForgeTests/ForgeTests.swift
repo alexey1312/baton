@@ -143,4 +143,97 @@ struct GitHubForgeTests {
         #expect(report.findingsFoldedIntoSummary == 1)
         #expect(report.warnings.contains(where: { $0.contains("differs from current head") }))
     }
+
+    // MARK: - Auto-resolve outdated threads
+
+    /// One review thread as the GraphQL `reviewThreads` read returns it. Defaults
+    /// describe an obsolete Baton thread (outdated, unresolved, carries the finding
+    /// marker, not yet auto-resolved) — the only shape that should be resolved.
+    private func threadsJSON(
+        isResolved: Bool = false,
+        isOutdated: Bool = true,
+        findingMarker: Bool = true,
+        extraComment: String? = nil
+    ) -> String {
+        let body = "**🔴 high — bug**\\n\\n" + (findingMarker ? BatonMarker.finding : "no marker")
+        var comments = [#"{"databaseId":555,"body":"\#(body)","path":"ios/A.swift","line":10}"#]
+        if let extra = extraComment {
+            comments.append(#"{"databaseId":556,"body":"\#(extra)","path":"ios/A.swift","line":10}"#)
+        }
+        return """
+        {"data":{"repository":{"pullRequest":{
+          "author":{"login":"alice"},
+          "reviewThreads":{"nodes":[
+            {"id":"T1","isResolved":\(isResolved),"isOutdated":\(isOutdated),"resolvedBy":null,
+             "comments":{"nodes":[\(comments.joined(separator: ","))]}}
+          ]}
+        }}}}
+        """
+    }
+
+    /// Route `gh` calls during an auto-resolving publish: the thread read vs the
+    /// resolve mutation are both `api graphql`, told apart by the request body.
+    private func resolvingGH(threads: String, reply: GHResult? = nil) -> MockGH {
+        MockGH { args, stdin in
+            if args.contains("graphql") {
+                return (stdin ?? "").contains("resolveReviewThread") ? ok("{}") : ok(threads)
+            }
+            if let reply, (stdin ?? "").contains("in_reply_to") { return reply }
+            return ok("[]")
+        }
+    }
+
+    @Test("an outdated Baton thread is replied-to with the marker, then resolved")
+    func resolvesOutdatedThread() async throws {
+        let gh = resolvingGH(threads: threadsJSON())
+        let report = try await GitHubForge(gh: gh, options: .init(resolveOutdatedThreads: true))
+            .publish(run: run(findings: [highFinding]), context: prContext)
+        #expect(report.threadsResolved == 1)
+        #expect(report.threadsResolveSkipped == 0)
+
+        let calls = await gh.calls
+        let reply = try #require(calls.first { ($0.stdin ?? "").contains("in_reply_to") })
+        #expect((reply.stdin ?? "").contains(BatonMarker.autoResolved))
+        #expect(!(reply.stdin ?? "").contains(BatonMarker.finding)) // reply is not a finding comment
+        #expect(calls.contains { ($0.stdin ?? "").contains("resolveReviewThread") })
+    }
+
+    @Test("auto-resolve skips non-outdated, resolved, non-Baton, and already-resolved threads")
+    func autoResolveSkips() async throws {
+        let alreadyMarked = "Auto-resolved\\n\(BatonMarker.autoResolved)"
+        let cases = [
+            threadsJSON(isOutdated: false), // not outdated
+            threadsJSON(isResolved: true), // already resolved
+            threadsJSON(findingMarker: false), // not Baton-authored
+            threadsJSON(extraComment: alreadyMarked), // idempotency: already auto-resolved
+        ]
+        for threads in cases {
+            let gh = resolvingGH(threads: threads)
+            let report = try await GitHubForge(gh: gh, options: .init(resolveOutdatedThreads: true))
+                .publish(run: run(findings: [highFinding]), context: prContext)
+            #expect(report.threadsResolved == 0)
+            let calls = await gh.calls
+            #expect(!calls.contains { ($0.stdin ?? "").contains("in_reply_to") })
+            #expect(!calls.contains { ($0.stdin ?? "").contains("resolveReviewThread") })
+        }
+    }
+
+    @Test("auto-resolve reads no threads when the flag is off")
+    func autoResolveDisabledByDefault() async throws {
+        let gh = MockGH { _, _ in ok("[]") }
+        _ = try await GitHubForge(gh: gh).publish(run: run(findings: [highFinding]), context: prContext)
+        #expect(await !(gh.calls).contains { $0.args.contains("graphql") })
+    }
+
+    @Test("a forbidden auto-resolve degrades to a warning without failing the publish")
+    func autoResolveDegrades() async throws {
+        let forbidden = GHResult(status: 1, stdout: "", stderr: "HTTP 403: Resource not accessible by integration")
+        let gh = resolvingGH(threads: threadsJSON(), reply: forbidden)
+        let report = try await GitHubForge(gh: gh, options: .init(resolveOutdatedThreads: true))
+            .publish(run: run(findings: [highFinding]), context: prContext)
+        #expect(report.threadsResolved == 0)
+        #expect(report.threadsResolveSkipped == 1)
+        #expect(report.reviewPosted) // the review still posted
+        #expect(report.warnings.contains { $0.contains("auto-resolution skipped") })
+    }
 }

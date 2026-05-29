@@ -73,7 +73,18 @@ struct ConfigCommand: AsyncParsableCommand {
             }
         }
         lines.append(contentsOf: formatLearn(config))
+        lines.append(contentsOf: formatPublish(config))
         return lines.joined(separator: "\n")
+    }
+
+    private func formatPublish(_ config: EffectiveConfig) -> [String] {
+        // Publish settings are repository-global; show them on the root scope only.
+        guard config.scopePath.isEmpty else { return [] }
+        let value = config.publish.resolveOutdatedThreads
+        return [
+            "[publish]",
+            "  resolve_outdated_threads = \(value)\(provenance("publish.resolve_outdated_threads", config))",
+        ]
     }
 
     private func formatLearn(_ config: EffectiveConfig) -> [String] {

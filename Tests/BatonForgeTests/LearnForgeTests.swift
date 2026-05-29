@@ -136,6 +136,32 @@ struct LearnForgeTests {
         #expect(signal.resolvedByAutomation) // svc-account, though not a `[bot]`
     }
 
+    @Test("the auto-resolve marker flags automation regardless of the resolving actor")
+    func autoResolveMarkerIsTokenIndependent() async throws {
+        let finding = "**🔴 high — X**\\n\\n\(BatonMarker.finding)"
+        let reply = "Auto-resolved by Baton\\n\(BatonMarker.autoResolved)"
+        // A human login resolved the thread, but a later comment carries the
+        // auto-resolve marker — provenance must come from the marker, not the actor.
+        let json = """
+        {"data":{"repository":{"pullRequest":{
+          "author":{"login":"author"},
+          "reviewThreads":{"nodes":[
+            {"id":"T1","isResolved":true,"isOutdated":true,"resolvedBy":{"login":"human-dev"},
+             "comments":{"nodes":[
+               {"databaseId":1,"body":"\(finding)","path":"ios/A.swift","line":1},
+               {"databaseId":2,"body":"\(reply)","path":"ios/A.swift","line":1}
+             ]}}
+          ]}
+        }}}}
+        """
+        let gh = MockGH { args, _ in contains(args, "graphql") ? ok(json) : ok("[]") }
+        let forge = GitHubLearnForge(gh: gh, repo: "o/r")
+        let pr = MergedPullRequest(number: 1, author: "author", mergedAt: Date())
+        let signal = try #require(try await forge.threadSignals(for: pr).first)
+        #expect(signal.resolvedByAutomation) // marker present, though "human-dev" is a human actor
+        #expect(signal.resolutionActor == "human-dev")
+    }
+
     @Test("a GraphQL query-level error fails hard instead of yielding empty signal")
     func graphQLErrorFailsHard() async throws {
         let errorBody = #"{"data":null,"errors":[{"message":"Could not resolve to a Repository"}]}"#

@@ -15,6 +15,9 @@ public enum ForgeError: BatonError {
     case writePermissionDenied(detail: String)
     /// The token cannot create Check Runs (a PAT, not a GitHub App token).
     case checkRunForbidden(detail: String)
+    /// The token cannot post the auto-resolve reply or invoke `resolveReviewThread`.
+    /// Degradable: auto-resolution is best-effort and never fails a publish.
+    case threadResolveForbidden(detail: String)
     /// GitHub returned a rate-limit response and retries were exhausted.
     case rateLimited(detail: String)
     /// GitHub returned a 5xx response and retries were exhausted.
@@ -34,6 +37,8 @@ public enum ForgeError: BatonError {
             "GitHub rejected the publish: write permission denied (\(detail))."
         case let .checkRunForbidden(detail):
             "GitHub rejected creating Check Runs: \(detail)."
+        case let .threadResolveForbidden(detail):
+            "GitHub rejected auto-resolving a review thread: \(detail)."
         case let .rateLimited(detail):
             "GitHub rate-limited the publish after retries (\(detail))."
         case let .serverError(detail):
@@ -57,6 +62,9 @@ public enum ForgeError: BatonError {
         case .checkRunForbidden:
             "The Checks API requires a GitHub App token (the Actions GITHUB_TOKEN). A plain PAT used " +
                 "locally cannot create Check Runs; the PR review was still posted."
+        case .threadResolveForbidden:
+            "The token lacks permission to reply to or resolve review threads; auto-resolution was " +
+                "skipped and the review and Check Runs were still posted."
         case .rateLimited:
             "Wait for the rate-limit window to reset (a few minutes) and re-run `baton publish`."
         case .serverError:

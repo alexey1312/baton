@@ -35,6 +35,13 @@ enum GitHubAPIBodies {
         let summary: String
     }
 
+    /// Body for `POST /repos/{owner}/{repo}/pulls/{pr}/comments` posting a reply to
+    /// an existing review thread (the auto-resolve provenance marker).
+    struct ReplyComment: Encodable {
+        let body: String
+        let in_reply_to: Int
+    }
+
     /// Body for the GraphQL `resolveReviewThread` mutation call.
     struct GraphQLResolveThread: Encodable {
         let query: String

@@ -5,8 +5,13 @@ import Foundation
 /// Bridges the `publish` command to `BatonForge.GitHubForge`: preflight, resolve the
 /// publish context, post, and present the report.
 enum Publisher {
-    static func publish(run: LoadedRun, overrides: PublishOverrides, outputMode: OutputMode) async throws {
-        let forge = GitHubForge()
+    static func publish(
+        run: LoadedRun,
+        overrides: PublishOverrides,
+        resolveOutdatedThreads: Bool = false,
+        outputMode: OutputMode
+    ) async throws {
+        let forge = GitHubForge(options: .init(resolveOutdatedThreads: resolveOutdatedThreads))
         try await forge.preflight()
 
         let context = try PublishContext.resolve(overrides: overrides, env: GitHubEnv.detect())
@@ -22,6 +27,8 @@ enum Publisher {
             + "\(report.checkRunsCreated) check run(s)"
             + (report.checkRunsSkipped > 0 ? ", \(report.checkRunsSkipped) skipped" : "")
             + (report.inlineCommentsDeduped > 0 ? ", \(report.inlineCommentsDeduped) deduped" : "")
+            + (report.threadsResolved > 0 ? ", \(report.threadsResolved) thread(s) resolved" : "")
+            + (report.threadsResolveSkipped > 0 ? ", \(report.threadsResolveSkipped) resolve(s) skipped" : "")
             + "."
         TerminalOutput.shared.out(NooraUI.success(summary, useColors: colors))
     }
