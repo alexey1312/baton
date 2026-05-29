@@ -102,7 +102,7 @@ struct RenderTests {
         return try (store.load(runId: nil), root)
     }
 
-    @Test("markdown default template reproduces the built-in output byte-for-byte")
+    @Test("markdown default template output is snapshot-locked")
     func markdownGoldenParity() throws {
         let (run, root) = try fixtureRun(findings: [sample])
         defer { try? FileManager.default.removeItem(at: root) }

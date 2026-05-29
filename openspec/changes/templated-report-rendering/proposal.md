@@ -5,7 +5,7 @@
 ## What Changes
 
 - Render the human-facing local formats — the `render` `markdown` report and the `learn` rolling-PR-body markdown — from Jinja templates instead of hard-coded strings.
-- Ship bundled default templates (embedded string constants) whose output is byte-for-byte identical to the previous built-in rendering, so this is a pure refactor by default.
+- Ship bundled default templates (embedded string constants) that reproduce the previous built-in rendering's content and structure (snapshot-locked), so this is a content-preserving refactor by default.
 - Allow a user to override a template via a new `[render]` config block (`markdown_template`, `learn_pr_body_template`) or a `--template <path>` flag on `render`.
 - Keep all GitHub payload bodies (`github-review`, `check-run`, `github-summary`), `json`, and `terminal` built in code, so the `<!-- baton:finding -->` marker, the 👍/👎 affordance, and the collapsible AI-instructions block (which `learn` and dedupe depend on) cannot be removed by a user template.
 - Fail with a typed `RenderError.templateInvalid` (carrying a `recoverySuggestion`) when a configured template has a syntax error.

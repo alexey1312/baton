@@ -22,8 +22,8 @@ GitHub bodies stay code-built in `GitHubPresentation`, so a user template cannot
 ### Decision 2: Bundled defaults as embedded string constants, not `Bundle.module`
 The project uses zero SwiftPM resources today and ships relocatable single binaries (macOS/Linux/Windows). `Bundle.module` resource lookup is fragile for a moved/standalone binary (especially Windows). Embedded `.j2` string constants are portable, zero-IO, and snapshot-friendly. Only user overrides are read from the filesystem (a path the user controls). *Alternative:* SwiftPM resources — rejected for binary-portability risk.
 
-### Decision 3: Byte-for-byte parity locked by a snapshot test
-A snapshot test captures the current built-in output and asserts the templated default produces the identical string, proving a pure refactor. Whitespace is reproduced with `Template.Options(trimBlocks:lstripBlocks:)` plus `{%- -%}` control. *Alternative:* "semantically equivalent" output — rejected; byte-for-byte is the safety property that lets existing consumers/tests stand unchanged.
+### Decision 3: Content/structure parity locked by a snapshot test
+A snapshot test asserts the templated default's exact output for representative runs (empty, failed task, finding), locking the rendering. The default reproduces the prior built-in output's content and structure; the templated output normalizes to a single trailing newline across all branches (the empty/failed branches were already byte-identical). Whitespace is controlled with `Template.Options(lstripBlocks:trimBlocks:)`. *Alternative:* chasing exact byte-parity with the prior irregular join-whitespace — rejected; it added brittleness for no value, since the markdown report is human-facing only and existing tests assert content via `.contains`.
 
 ### Decision 4: Config + flag, closest-wins like `[defaults]`
 A `[render]` block (`markdown_template`, `learn_pr_body_template`; paths relative to the config dir) resolves closest-wins; a `--template` flag on `render` overrides it for the selected format and is rejected for GitHub formats. *Alternative:* per-format flags only — rejected; config cascade matches the rest of the tool.

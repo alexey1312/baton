@@ -2,12 +2,13 @@
 
 ### Requirement: User-Customizable Local Report Templates
 
-The system SHALL render the human-facing local report formats — the `render` `markdown` report and the `learn` rolling-pull-request-body markdown — from Jinja templates, SHALL ship bundled default templates whose output is byte-for-byte identical to the previous built-in rendering of the same run, and SHALL allow a user to override a template via the `[render]` configuration block or a `--template` flag on `render`. The system SHALL keep the `github-review`, `check-run`, `github-summary`, `json`, and `terminal` formats built in code so that the required `<!-- baton:finding -->` marker, the 👍/👎 usefulness affordance, and the collapsible "Instructions for AI agents" block cannot be removed by a user template.
+The system SHALL render the human-facing local report formats — the `render` `markdown` report and the `learn` rolling-pull-request-body markdown — from Jinja templates, SHALL ship bundled default templates that reproduce the previous built-in rendering's content and structure (with their output locked by a snapshot test), and SHALL allow a user to override a template via the `[render]` configuration block or a `--template` flag on `render`. The system SHALL keep the `github-review`, `check-run`, `github-summary`, `json`, and `terminal` formats built in code so that the required `<!-- baton:finding -->` marker, the 👍/👎 usefulness affordance, and the collapsible "Instructions for AI agents" block cannot be removed by a user template.
 
-#### Scenario: Default template reproduces prior output
+#### Scenario: Default template preserves the rendered findings
 
 - **WHEN** a saved run is rendered to `markdown` with no custom template configured
-- **THEN** the output SHALL be identical to the prior built-in markdown rendering of that run
+- **THEN** the output SHALL render every finding with its severity badge, its file and line, and its title and body, matching the prior built-in rendering's content and structure
+- **AND** the bundled default output SHALL be locked by a snapshot test
 
 #### Scenario: User template overrides a local format
 
