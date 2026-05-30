@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2026-05-30
+
+### Documentation
+
+- **claude**: Drop HK=0 bypass guidance; let pre-commit hooks run by @alexey1312
+
+
+### Miscellaneous Tasks
+
+- Rename repo references swift-baton -> baton by @alexey1312
+
+
+## [0.1.3] - 2026-05-29
+
+### Documentation
+
+- **claude**: Blick reference, CI dogfooding via mise release binary, learn JSON-proposal model, release/brew checklist by @alexey1312
+
+
+### Features
+
+- **learn**: Configurable agent/model for the learning pass by @alexey1312
+
+
+### Styling
+
+- **test**: Doc-comment the CascadeTests extension marker by @alexey1312
+
+
 ## [0.1.2] - 2026-05-29
 
 ### Bug Fixes
