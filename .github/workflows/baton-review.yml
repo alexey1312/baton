@@ -78,7 +78,7 @@ jobs:
 
       - name: Install baton from the GitHub release
         run: |
-          mise use --global "github:alexey1312/swift-baton@latest"
+          mise use --global "github:alexey1312/baton@latest"
           baton --version
 
       # Save a run record. continue-on-error so a fail_on exit (high finding) does not

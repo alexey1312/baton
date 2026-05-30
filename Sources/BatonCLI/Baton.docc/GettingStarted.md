@@ -27,7 +27,7 @@ Run `baton doctor` at any time to verify these prerequisites.
 ### Using mise
 
 ```bash
-mise use -g github:alexey1312/swift-baton
+mise use -g github:alexey1312/baton
 ```
 
 ### Using Homebrew
@@ -39,15 +39,15 @@ brew install alexey1312/tap/baton
 ### From Source
 
 ```bash
-git clone https://github.com/alexey1312/swift-baton.git
-cd swift-baton
+git clone https://github.com/alexey1312/baton.git
+cd baton
 swift build -c release
 cp .build/release/baton /usr/local/bin/
 ```
 
 ### Download a Binary
 
-Download the latest archive from [GitHub Releases](https://github.com/alexey1312/swift-baton/releases).
+Download the latest archive from [GitHub Releases](https://github.com/alexey1312/baton/releases).
 macOS binaries are universal (`arm64` + `x86_64`).
 
 > Note: macOS binaries are not code-signed or notarized in the current release; you may need to

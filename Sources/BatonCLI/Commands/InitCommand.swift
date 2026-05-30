@@ -56,7 +56,7 @@ struct InitCommand: AsyncParsableCommand {
 
     private func starterConfig() -> String {
         var lines = [
-            "# Baton configuration. See https://github.com/alexey1312/swift-baton",
+            "# Baton configuration. See https://github.com/alexey1312/baton",
             "",
             "[agent]",
             "kind = \"\(agent.rawValue)\"",

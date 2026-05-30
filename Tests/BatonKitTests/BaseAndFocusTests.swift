@@ -20,12 +20,12 @@ struct BaseAndFocusTests {
     func envDetect() throws {
         let env = [
             "GITHUB_ACTIONS": "true",
-            "GITHUB_REPOSITORY": "alexey1312/swift-baton",
+            "GITHUB_REPOSITORY": "alexey1312/baton",
             "GITHUB_SHA": "abcdef",
             "GITHUB_EVENT_NAME": "pull_request",
         ]
         let ctx = try #require(GitHubEnv.detect(env: env, fileReader: { _ in nil }))
-        #expect(ctx.repository == "alexey1312/swift-baton")
+        #expect(ctx.repository == "alexey1312/baton")
         #expect(ctx.headSHA == "abcdef")
         #expect(ctx.eventName == "pull_request")
         #expect(ctx.prNumber == nil)

@@ -215,7 +215,7 @@ jobs:
         id: sha
         run: |
           # VERSION includes the leading "v"; the release assets are tagged with it.
-          REPO="alexey1312/swift-baton"
+          REPO="alexey1312/baton"
           BASE="https://github.com/${REPO}/releases/download/${VERSION}"
 
           curl -fsSL "${BASE}/baton-${VERSION}-macos.tar.gz" -o baton-macos.tar.gz

@@ -1,11 +1,11 @@
 # Baton
 
-[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Falexey1312%2Fswift-baton%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/alexey1312/swift-baton)
-[![Swift](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Falexey1312%2Fswift-baton%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/alexey1312/swift-baton)
-[![CI](https://github.com/alexey1312/swift-baton/actions/workflows/ci.yml/badge.svg)](https://github.com/alexey1312/swift-baton/actions/workflows/ci.yml)
-[![Release](https://github.com/alexey1312/swift-baton/actions/workflows/release.yml/badge.svg)](https://github.com/alexey1312/swift-baton/actions/workflows/release.yml)
-[![Docs](https://github.com/alexey1312/swift-baton/actions/workflows/deploy-docc.yml/badge.svg)](https://alexey1312.github.io/baton/documentation/batoncli)
-[![License](https://img.shields.io/github/license/alexey1312/swift-baton.svg)](LICENSE)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Falexey1312%2Fbaton%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/alexey1312/baton)
+[![Swift](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Falexey1312%2Fbaton%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/alexey1312/baton)
+[![CI](https://github.com/alexey1312/baton/actions/workflows/ci.yml/badge.svg)](https://github.com/alexey1312/baton/actions/workflows/ci.yml)
+[![Release](https://github.com/alexey1312/baton/actions/workflows/release.yml/badge.svg)](https://github.com/alexey1312/baton/actions/workflows/release.yml)
+[![Docs](https://github.com/alexey1312/baton/actions/workflows/deploy-docc.yml/badge.svg)](https://alexey1312.github.io/baton/documentation/batoncli)
+[![License](https://img.shields.io/github/license/alexey1312/baton.svg)](LICENSE)
 
 Baton runs AI code review across a monorepo, one scope at a time. Each subtree keeps its own
 `baton.toml`, and the settings cascade down the tree with the closest one winning, so the iOS
@@ -37,7 +37,7 @@ the findings or posts them to a GitHub pull request. The full documentation is a
 ### mise (recommended)
 
 ```sh
-mise use -g github:alexey1312/swift-baton
+mise use -g github:alexey1312/baton
 ```
 
 ### Homebrew
@@ -49,8 +49,8 @@ brew install alexey1312/tap/baton
 ### Build from source
 
 ```sh
-git clone https://github.com/alexey1312/swift-baton.git
-cd swift-baton
+git clone https://github.com/alexey1312/baton.git
+cd baton
 swift build -c release
 .build/release/baton --help
 ```

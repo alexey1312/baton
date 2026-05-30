@@ -21,7 +21,7 @@ All notable changes to this project will be documented in this file.
 
 ### Testing
 
-- Second learn-signal probe (force-unwrap) for a 2-thread theme  by @alexey1312 in [#3](https://github.com/alexey1312/swift-baton/pull/3)
+- Second learn-signal probe (force-unwrap) for a 2-thread theme  by @alexey1312 in [#3](https://github.com/alexey1312/baton/pull/3)
 
 
 ## [0.1.1] - 2026-05-29
@@ -51,7 +51,7 @@ All notable changes to this project will be documented in this file.
 
 ### Testing
 
-- Temporary probe to give baton learn a merged-PR signal  by @alexey1312 in [#2](https://github.com/alexey1312/swift-baton/pull/2)
+- Temporary probe to give baton learn a merged-PR signal  by @alexey1312 in [#2](https://github.com/alexey1312/baton/pull/2)
 
 
 ## [0.1.0] - 2026-05-29

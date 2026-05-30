@@ -56,7 +56,7 @@ The system SHALL, on a non-prerelease release, update the Homebrew formula `Form
 
 ### Requirement: mise Install Channel
 
-The system SHALL attach the platform archives to each GitHub Release so the tool is installable through `mise` using its github backend (e.g. `mise use -g github:alexey1312/swift-baton`).
+The system SHALL attach the platform archives to each GitHub Release so the tool is installable through `mise` using its github backend (e.g. `mise use -g github:alexey1312/baton`).
 
 #### Scenario: Releases feed the mise github backend
 

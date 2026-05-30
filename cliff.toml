@@ -3,7 +3,7 @@
 
 [remote.github]
 owner = "alexey1312"
-repo = "swift-baton"
+repo = "baton"
 
 [changelog]
 # Template for the changelog header
@@ -26,7 +26,7 @@ body = """
         - {% if commit.scope %}**{{ commit.scope }}**: {% endif %}\
             {{ commit.message | upper_first }}\
             {% if commit.remote.username %} by @{{ commit.remote.username }}{% endif %}\
-            {% if commit.remote.pr_number %} in [#{{ commit.remote.pr_number }}](https://github.com/alexey1312/swift-baton/pull/{{ commit.remote.pr_number }}){% endif %}
+            {% if commit.remote.pr_number %} in [#{{ commit.remote.pr_number }}](https://github.com/alexey1312/baton/pull/{{ commit.remote.pr_number }}){% endif %}
     {% endfor %}
 {% endfor %}\n
 """
