@@ -150,6 +150,61 @@ dprint check
 """
 
 # =============================================================================
+# Dogfooding (pre-push)
+# =============================================================================
+
+# Run baton's own review over the commits a `git push` is about to publish.
+# Wired into the pre-push git hook (.githooks/pre-push). Blocking: a non-zero
+# exit (findings >= fail_on, or a task failure) aborts the push.
+#
+# Graceful skips (exit 0, push proceeds) keep the hook from wedging pushes when
+# review is impossible or pointless:
+#   - BATON_PREPUSH=0 set                  (explicit opt-out)
+#   - no upstream configured for the branch (nothing to diff against)
+#   - HEAD already matches the upstream     (nothing being pushed)
+# Bypass everything with `git push --no-verify`.
+#
+# It diffs against the upstream ref (not the working tree), so it reviews the
+# pushed commits even though the tree is clean at push time. Prefers an already
+# built baton binary; falls back to a debug build from source (this repo).
+[tasks.prepush-review]
+description = "Review the commits being pushed with baton (pre-push hook)"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${BATON_PREPUSH:-1}" = "0" ]; then
+  echo "baton: pre-push review skipped (BATON_PREPUSH=0)"
+  exit 0
+fi
+
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
+if [ -z "$upstream" ]; then
+  echo "baton: no upstream for this branch; skipping pre-push review"
+  exit 0
+fi
+if git diff --quiet "$upstream" HEAD; then
+  echo "baton: no changes vs $upstream; skipping pre-push review"
+  exit 0
+fi
+
+baton_bin="$(command -v baton || true)"
+if [ -z "$baton_bin" ]; then
+  for candidate in .build/release/baton .build/debug/baton; do
+    if [ -x "$candidate" ]; then baton_bin="$candidate"; break; fi
+  done
+fi
+if [ -z "$baton_bin" ]; then
+  echo "baton: building debug binary for pre-push review…"
+  swift build -q
+  baton_bin=.build/debug/baton
+fi
+
+echo "baton: reviewing changes vs $upstream (bypass: BATON_PREPUSH=0 or git push --no-verify)"
+exec "$baton_bin" review --base "$upstream"
+"""
+
+# =============================================================================
 # Docs, changelog, clean
 # =============================================================================
 

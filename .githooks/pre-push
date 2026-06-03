@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-push hook — dogfoods baton's own review on the commits being pushed
+# (delegated to the `prepush-review` mise task). Blocking: a non-zero exit
+# aborts the push.
+# Skip with: HK=0 or BATON_PREPUSH=0. Bypass entirely: git push --no-verify.
+test "${HK:-1}" = "0" && exit 0
+
+if ! command -v mise >/dev/null 2>&1; then
+    echo "baton: mise not found on PATH; skipping pre-push review (install mise or set HK=0)" >&2
+    exit 0
+fi
+
+exec mise run prepush-review

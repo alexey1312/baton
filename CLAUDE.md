@@ -58,6 +58,7 @@ that slice; findings render locally or publish to a GitHub PR via `gh`.
 ## Workflow
 
 - Commit directly to `main`, granular Conventional Commits. Let the `hk` pre-commit hooks run (don't bypass them) — they catch `swiftformat --lint`/`swiftlint`/`actionlint` before push.
+- Git hooks live in `.githooks/` (wired via `core.hooksPath`, set by `mise run setup` and the `[hooks] enter` block). `pre-commit`/`commit-msg` route to `hk`; **`pre-push` dogfoods `baton review` itself** via the `prepush-review` mise task — it reviews the commits being pushed (diff vs `@{upstream}`, not the working tree) and **blocks** the push on findings ≥ `fail_on`. Graceful-skips when there's no upstream / nothing to push / `BATON_PREPUSH=0`; bypass with `git push --no-verify`. It prefers a built `baton` (`.build/release` or `.build/debug`), else builds debug from source. NB: a stale absolute `core.hooksPath` (e.g. after a repo-dir rename) silently disables all hooks — re-run `mise run setup`.
 - After a chunk: `swiftformat` → `swiftlint --strict` → `swift test` (through xcsift), commit, push, then `gh run watch <id>` to verify CI.
 - Tooling/CI scaffolding is ported from the ExFig project at `/Users/aleksei/Developer/ExFig` — compare against it when CI/tooling misbehaves.
 - baton's agent-invocation flags (`ClaudeRunner`) and the entire `learn` mode are ported from **tuist/blick** (`src/agent/`, `src/learn/agent_pass.rs`) — compare against blick when agent/learn behavior misbehaves.
