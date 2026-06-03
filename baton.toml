@@ -1,6 +1,6 @@
 [agent]
 kind = "claude"
-model = "haiku"
+model = "sonnet"
 
 [[skills]]
 name = "swift-style"
@@ -29,5 +29,6 @@ Review the added (`+`) lines in the diff for Swift Concurrency correctness, usin
 [learn]
 # Solo maintainer reviews their own PRs, so their 👍/👎 are legitimate signal.
 count_author_reactions = true
-# learn reasons over accumulated signal — give it a smarter model than per-PR review (haiku).
+# learn reasons over accumulated signal — pin a capable model explicitly so it stays
+# strong even if per-PR review is later dialed down.
 model = "sonnet"
