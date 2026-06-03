@@ -194,12 +194,16 @@ if git diff --quiet "$upstream" HEAD; then
 fi
 
 echo "baton: reviewing changes vs $upstream (bypass: BATON_PREPUSH=0 or git push --no-verify)"
+# Serialize agent calls (--max-concurrency 1): the local `claude` CLI flakes when
+# two sessions launch at once (one exits 1 with no output), which would fail the
+# whole push spuriously.
+review_args=(review --base "$upstream" --max-concurrency 1)
 if [ -n "${BATON_BIN:-}" ]; then
-  exec "$BATON_BIN" review --base "$upstream"
+  exec "$BATON_BIN" "${review_args[@]}"
 elif command -v baton >/dev/null 2>&1; then
-  exec baton review --base "$upstream"
+  exec baton "${review_args[@]}"
 else
-  exec mise x "github:alexey1312/baton@latest" -- baton review --base "$upstream"
+  exec mise x "github:alexey1312/baton@latest" -- baton "${review_args[@]}"
 fi
 """
 
