@@ -43,6 +43,11 @@ public struct ReviewTaskResult: Sendable, Codable {
     public var agentKind: String?
     /// The resolved model for this task, if one was set. Optional.
     public var model: String?
+    /// Set by cross-task dedup when a finding that crossed this review's `failOn`
+    /// was merged away into a sibling review. Keeps `failed` (and thus the run's
+    /// exit code) from being softened by deduplication. Optional on decode so
+    /// legacy run records still load.
+    public var removedCrossingFindings: Bool
 
     public init(
         scope: String,
@@ -56,7 +61,8 @@ public struct ReviewTaskResult: Sendable, Codable {
         durationMs: Int? = nil,
         usage: AgentUsage? = nil,
         agentKind: String? = nil,
-        model: String? = nil
+        model: String? = nil,
+        removedCrossingFindings: Bool = false
     ) {
         self.scope = scope
         self.review = review
@@ -70,12 +76,35 @@ public struct ReviewTaskResult: Sendable, Codable {
         self.usage = usage
         self.agentKind = agentKind
         self.model = model
+        self.removedCrossingFindings = removedCrossingFindings
+    }
+
+    /// Custom decode so records predating `removedCrossingFindings` still load. Keeps
+    /// the existing strictness for fields that were always required. `encode` stays
+    /// synthesized (keys are the property names, unchanged on disk).
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        scope = try container.decode(String.self, forKey: .scope)
+        review = try container.decode(String.self, forKey: .review)
+        findings = try container.decode([Finding].self, forKey: .findings)
+        failOn = try container.decode(Severity.self, forKey: .failOn)
+        taskFailed = try container.decode(Bool.self, forKey: .taskFailed)
+        errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+        warnings = try container.decode([String].self, forKey: .warnings)
+        truncatedFiles = try container.decode([String].self, forKey: .truncatedFiles)
+        durationMs = try container.decodeIfPresent(Int.self, forKey: .durationMs)
+        usage = try container.decodeIfPresent(AgentUsage.self, forKey: .usage)
+        agentKind = try container.decodeIfPresent(String.self, forKey: .agentKind)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        removedCrossingFindings = try container.decodeIfPresent(Bool.self, forKey: .removedCrossingFindings) ?? false
     }
 
     /// Whether this review failed under its `fail_on` threshold: any finding at or
-    /// above `failOn`, or a task error.
+    /// above `failOn`, a task error, or a threshold-crossing finding that cross-task
+    /// dedup merged into a sibling review.
     public var failed: Bool {
         if taskFailed { return true }
+        if removedCrossingFindings { return true }
         return findings.contains { $0.severity >= failOn }
     }
 

@@ -11,6 +11,9 @@ public struct FindingRow: Sendable, Codable, Equatable {
     public var title: String
     public var body: String
     public var aiInstructions: String?
+    /// Reviews that confirmed this finding via cross-task dedup; empty when reported
+    /// by a single review.
+    public var confirmedBy: [String]
 
     public init(
         findingId: String,
@@ -21,7 +24,8 @@ public struct FindingRow: Sendable, Codable, Equatable {
         severity: String,
         title: String,
         body: String,
-        aiInstructions: String? = nil
+        aiInstructions: String? = nil,
+        confirmedBy: [String] = []
     ) {
         self.findingId = findingId
         self.taskId = taskId
@@ -32,5 +36,6 @@ public struct FindingRow: Sendable, Codable, Equatable {
         self.title = title
         self.body = body
         self.aiInstructions = aiInstructions
+        self.confirmedBy = confirmedBy
     }
 }

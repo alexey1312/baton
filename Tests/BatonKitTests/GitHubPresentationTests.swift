@@ -60,6 +60,31 @@ struct GitHubPresentationTests {
         #expect(identity.line == 9)
     }
 
+    @Test("confirmation note appears only for multi-review findings")
+    func confirmationNote() {
+        let single = Finding(file: "a", line: 1, severity: .low, title: "t", body: "b")
+        #expect(GitHubPresentation.confirmationNote(single) == nil)
+        let confirmed = Finding(
+            file: "a", line: 1, severity: .low, title: "t", body: "b",
+            confirmedBy: ["concurrency", "style"]
+        )
+        let note = GitHubPresentation.confirmationNote(confirmed)
+        #expect(note == "Confirmed by 2 reviews: concurrency, style")
+    }
+
+    @Test("confirmation note rides in the comment body without breaking finding identity")
+    func confirmationNoteParseable() throws {
+        let finding = Finding(
+            file: "x", line: 9, severity: .high, title: "SQL injection", body: "b",
+            confirmedBy: ["security", "style"]
+        )
+        let body = GitHubPresentation.inlineCommentBody(finding)
+        #expect(body.contains("Confirmed by 2 reviews"))
+        let identity = try #require(BatonMarker.parseFinding(body: body, file: "x.swift", line: 9))
+        #expect(identity.title == "SQL injection") // header/marker contract intact
+        #expect(identity.severity == .high)
+    }
+
     @Test("parseFinding returns nil without the marker, header, or a title")
     func parseFindingRejectsNonFindings() {
         #expect(BatonMarker.parseFinding(body: "plain comment", file: "a", line: 1) == nil)

@@ -90,7 +90,7 @@ public final class HistoryRepository: @unchecked Sendable {
         }
 
         let findingsSQL = """
-        SELECT finding_id, task_id, run_id, file, line, severity, title, body, ai_instructions
+        SELECT finding_id, task_id, run_id, file, line, severity, title, body, ai_instructions, confirmed_by
         FROM findings WHERE run_id = ?
         ORDER BY task_id, file, line
         """
@@ -181,7 +181,15 @@ public final class HistoryRepository: @unchecked Sendable {
             file: file,
             line: (row[4] as? Int64).map(Int.init),
             severity: severity, title: title, body: body,
-            aiInstructions: row[8] as? String
+            aiInstructions: row[8] as? String,
+            confirmedBy: decodeConfirmedBy(row[9] as? String)
         )
+    }
+
+    /// Decode the `confirmed_by` JSON-array column, tolerating absent/blank values
+    /// (legacy rows) by returning an empty list.
+    private static func decodeConfirmedBy(_ raw: String?) -> [String] {
+        guard let raw, !raw.isEmpty, let data = raw.data(using: .utf8) else { return [] }
+        return (try? JSONCodec.decode([String].self, from: data)) ?? []
     }
 }

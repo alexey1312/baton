@@ -54,6 +54,9 @@ enum Renderer {
                 if !finding.body.isEmpty {
                     lines.append("      \(finding.body)")
                 }
+                if let note = GitHubPresentation.confirmationNote(finding) {
+                    lines.append("      ✓ \(note)")
+                }
             }
         }
         return lines.joined(separator: "\n")

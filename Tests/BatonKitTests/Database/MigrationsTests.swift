@@ -35,6 +35,36 @@ struct MigrationsTests {
         #expect(try db.prepare(sql).makeIterator().next() != nil)
     }
 
+    @Test("v3 adds the confirmed_by column defaulting to an empty JSON array")
+    func confirmedByColumn() throws {
+        let db = try Connection(.inMemory)
+        try Migrations.run(on: db)
+        let columns = try db.prepare("PRAGMA table_info(findings)").compactMap { $0[1] as? String }
+        #expect(columns.contains("confirmed_by"))
+
+        try db.run(
+            """
+            INSERT INTO runs(run_id, repo_id, repo_root, base_ref, head_sha, created_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            "r", "repo", "/tmp", "main", "sha", 1.0, "success"
+        )
+        try db.run(
+            "INSERT INTO tasks(task_id, run_id, scope, review, agent_kind, fail_on) VALUES (?, ?, ?, ?, ?, ?)",
+            "r:t", "r", "", "sec", "claude", "high"
+        )
+        // An insert that omits confirmed_by (a legacy-shaped write) gets the default.
+        try db.run(
+            """
+            INSERT INTO findings(finding_id, task_id, run_id, file, severity, title, body)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            "f", "r:t", "r", "a.swift", "high", "t", "b"
+        )
+        let row = try db.prepare("SELECT confirmed_by FROM findings WHERE finding_id = 'f'").makeIterator().next()
+        #expect((row?[0] as? String) == "[]")
+    }
+
     @Test("currentVersion throws when schema_version is not an integer")
     func currentVersionRejectsGarbage() throws {
         let db = try Connection(.inMemory)

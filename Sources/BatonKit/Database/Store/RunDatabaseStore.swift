@@ -243,11 +243,12 @@ public struct RunDatabaseStore: Sendable {
 
     private func insertFinding(taskId: String, runId: String, finding: Finding, db: Connection) throws {
         let findingId = Self.makeFindingId(taskId: taskId, finding: finding)
+        let confirmedBy = try String(bytes: JSONCodec.encode(finding.confirmedBy), encoding: .utf8) ?? "[]"
         try db.run(
             """
             INSERT OR REPLACE INTO findings(
-                finding_id, task_id, run_id, file, line, severity, title, body, ai_instructions
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                finding_id, task_id, run_id, file, line, severity, title, body, ai_instructions, confirmed_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             findingId,
             taskId,
@@ -257,7 +258,8 @@ public struct RunDatabaseStore: Sendable {
             finding.severity.rawValue,
             finding.title,
             finding.body,
-            finding.aiInstructions
+            finding.aiInstructions,
+            confirmedBy
         )
     }
 

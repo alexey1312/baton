@@ -31,6 +31,10 @@ enum DefaultTemplates {
     - {{ fd.badge }} **{{ fd.title }}** (`{{ fd.location }}`)
 
       {{ fd.body }}
+    {% if fd.confirmed_count >= 2 %}
+
+      _Confirmed by {{ fd.confirmed_count }} reviews: {{ fd.confirmed_by }}_
+    {% endif %}
     {% endfor %}
     {% endfor %}
     """

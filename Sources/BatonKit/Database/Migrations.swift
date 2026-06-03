@@ -19,6 +19,7 @@ public enum Migrations {
     public static let all: [Migration] = [
         Migration(version: 1, sql: ddlV1),
         Migration(version: 2, sql: ddlV2),
+        Migration(version: 3, sql: ddlV3),
     ]
 
     /// Reads the current schema version from `meta`, or `0` if no row exists.
@@ -153,5 +154,12 @@ public enum Migrations {
         PRIMARY KEY (repo_id, finding_id)
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_repo_weight ON feedback(repo_id, weight);
+    """
+
+    /// Schema v3: records the reviews that cross-task dedup folded into a finding,
+    /// stored as a JSON array of review names. `'[]'` for single-review findings and
+    /// for every row that predates this column.
+    private static let ddlV3: String = """
+    ALTER TABLE findings ADD COLUMN confirmed_by TEXT NOT NULL DEFAULT '[]';
     """
 }

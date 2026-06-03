@@ -74,22 +74,35 @@ struct ReviewCommand: AsyncParsableCommand {
                 git: git,
                 referencesBudgetBytes: rootReferencesBudget(effectives)
             )
-            let reviewOutcome = ReviewOutcome(results: tasks.map(\.result))
+            // Fold findings that multiple parallel tasks reported for the same
+            // (file, line) into one (tagged "confirmed by N reviews") before any
+            // consumer — database, renderer, GitHub publish — sees them.
+            let mergedTasks = Self.dedupedAcrossTasks(tasks)
+            let reviewOutcome = ReviewOutcome(results: mergedTasks.map(\.result))
             let status: RunStatus = reviewOutcome.shouldFailExit ? .failed : .success
             let hook = RunRecordStore.DatabaseHook(
                 store: database, repo: repoIdentity, status: status, cliVersion: Self.cliVersion
             )
             let writeOutcome = try store.write(
                 runId: RunRecordStore.newRunId(),
-                base: resolvedBase, headSHA: headSHA, tasks: tasks, database: hook
+                base: resolvedBase, headSHA: headSHA, tasks: mergedTasks, database: hook
             )
             emitDatabaseWarnings(writeOutcome.databaseErrors)
 
-            try renderAndExit(store: store, tasks: tasks)
+            try renderAndExit(store: store, tasks: mergedTasks)
         }
     }
 
     // MARK: - Steps
+
+    /// Apply cross-task finding dedup while preserving each task's prompt/output
+    /// artifacts (the merge only rewrites `result.findings`; order and count hold).
+    private static func dedupedAcrossTasks(_ tasks: [CompletedTask]) -> [CompletedTask] {
+        let merged = CrossTaskDedup.merge(tasks.map(\.result))
+        return zip(tasks, merged).map { task, result in
+            CompletedTask(result: result, prompt: task.prompt, rawOutput: task.rawOutput, startedAt: task.startedAt)
+        }
+    }
 
     private func validateNamedReview(_ effectives: [EffectiveConfig]) throws {
         guard let name else { return }

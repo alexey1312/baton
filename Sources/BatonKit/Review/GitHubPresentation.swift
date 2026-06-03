@@ -86,6 +86,10 @@ public enum GitHubPresentation {
             lines.append(finding.body)
             lines.append("")
         }
+        if let note = confirmationNote(finding) {
+            lines.append("<sub>\(note)</sub>")
+            lines.append("")
+        }
         if let instructions = finding.aiInstructions, !instructions.isEmpty {
             lines.append(aiInstructionsBlock(instructions))
             lines.append("")
@@ -109,12 +113,24 @@ public enum GitHubPresentation {
             lines.append(finding.body)
             lines.append("")
         }
+        if let note = confirmationNote(finding) {
+            lines.append("<sub>\(note)</sub>")
+            lines.append("")
+        }
         if let instructions = finding.aiInstructions, !instructions.isEmpty {
             lines.append(aiInstructionsBlock(instructions))
             lines.append("")
         }
         lines.append(BatonMarker.finding)
         return lines.joined(separator: "\n")
+    }
+
+    /// A human note when a finding was confirmed by two or more reviews, else `nil`.
+    /// Rendered as a `<sub>` line that ``BatonMarker/parseFinding`` ignores (it reads
+    /// only the bold header and the footer marker), so finding identity is preserved.
+    public static func confirmationNote(_ finding: Finding) -> String? {
+        guard finding.confirmedBy.count >= 2 else { return nil }
+        return "Confirmed by \(finding.confirmedBy.count) reviews: \(finding.confirmedBy.joined(separator: ", "))"
     }
 
     /// A Check Run / github-summary body aggregating findings for a scope-review.

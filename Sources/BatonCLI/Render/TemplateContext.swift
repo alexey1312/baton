@@ -60,6 +60,8 @@ enum TemplateContext {
             "location": finding.line.map { "\(finding.file):\($0)" } ?? finding.file,
             "body": finding.body,
             "ai_instructions": finding.aiInstructions,
+            "confirmed_count": finding.confirmedBy.count,
+            "confirmed_by": finding.confirmedBy.joined(separator: ", "),
         ]
     }
 
