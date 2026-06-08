@@ -15,7 +15,7 @@ name = "swift-style"
 skills = ["swift-style"]
 glob = ["**/*.swift"]
 prompt = """
-Review the added (`+`) lines in the diff against the attached Swift style guide. Emit a finding for each rule the code violates, citing the rule. Return {"findings": []} if nothing violates.
+Review the added (`+`) lines in the diff against the attached Swift style guide. Emit a finding only for rules explicitly stated in the guide, citing the exact rule. Apply each rule exactly as scoped in the guide — rules stated for unit tests apply only to test files, not production source files. Return {"findings": []} if nothing violates.
 """
 
 [[reviews]]
